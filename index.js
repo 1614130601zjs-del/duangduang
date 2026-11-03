@@ -26,7 +26,7 @@ function ddJellyCfg(){
  if(typeof c.jellyTap!=='boolean')c.jellyTap=true;
  if(typeof c.jellyDrag!=='boolean')c.jellyDrag=true;
  if(typeof c.jellyShake!=='boolean')c.jellyShake=false;
- return {on:c.jellyOn,scope:['smudge','whole'].includes(c.jellyScope)?c.jellyScope:'local',tap:c.jellyTap,drag:c.jellyDrag,shake:c.jellyShake,amp:{soft:.6,mid:1,bouncy:1.5}[c.jellyStrength]||1};
+ return {on:c.jellyOn,scope:['smudge','whole'].includes(c.jellyScope)?c.jellyScope:'local',tap:c.jellyTap,drag:c.jellyDrag,shake:c.jellyShake,amp:{soft:.35,mid:.65,bouncy:1}[c.jellyStrength]||.65};
 }
 function ddJellyBrush(){const b=Number(ddCfg().jellyBrush);return Number.isFinite(b)&&b>0?Math.max(.02,Math.min(.2,b)):.075;}
 function ddJellyState(img){
@@ -91,16 +91,11 @@ function ddAttachJelly(img){
  };
  // 选区显示层：低分辨率画布放大，边缘自带柔化
  let accent=null;
- const accentRgb=()=>{
-  if(accent)return accent;
-  let col='';try{col=getComputedStyle(document.documentElement).getPropertyValue('--dd-accent').trim();}catch{}
-  try{const c=document.createElement('canvas');c.width=c.height=1;const x=c.getContext('2d');x.fillStyle='#e58aa8';if(col)x.fillStyle=col;x.fillRect(0,0,1,1);const d=x.getImageData(0,0,1,1).data;accent=[d[0],d[1],d[2]];}catch{accent=[229,138,168];}
-  return accent;
- };
+ const accentRgb=()=>[255,64,129]; // 选区固定用醒目的玫红，不随主题变化，放在各种图上都看得清
  const paintSel=()=>{
   if(!selCv)return;
   const x=selCv.getContext('2d'),id=x.createImageData(MW,MH),[r,g,b]=accentRgb();
-  for(let k=0;k<MW*MH;k++){id.data[k*4]=r;id.data[k*4+1]=g;id.data[k*4+2]=b;id.data[k*4+3]=Math.round(Math.min(1,S.mask[k])*140);}
+  for(let k=0;k<MW*MH;k++){id.data[k*4]=r;id.data[k*4+1]=g;id.data[k*4+2]=b;id.data[k*4+3]=Math.round(Math.min(1,S.mask[k])*175);}
   x.putImageData(id,0,0);
  };
  const placeOverlays=bx=>{
@@ -396,7 +391,7 @@ function ddBuildBar(overlay){
     const img=overlay.querySelector('img'),host=img.offsetParent||img.parentElement;if(!host)return;
     let ring=host.querySelector('.dd-jb-ring');if(!ring){ring=document.createElement('div');ring.className='dd-jb-ring';host.appendChild(ring);}
     const d=2.2*ddJellyBrush()*Math.min(img.clientWidth,img.clientHeight);
-    ring.style.cssText='position:absolute;pointer-events:none;z-index:4;border-radius:50%;border:2px solid var(--dd-accent,#e58aa8);background:color-mix(in srgb,var(--dd-accent,#e58aa8) 25%,transparent);width:'+d+'px;height:'+d+'px;left:'+(img.offsetLeft+img.clientWidth/2-d/2)+'px;top:'+(img.offsetTop+img.clientHeight/2-d/2)+'px';
+    ring.style.cssText='position:absolute;pointer-events:none;z-index:4;border-radius:50%;border:2px solid #ff4081;background:rgba(255,64,129,.25);width:'+d+'px;height:'+d+'px;left:'+(img.offsetLeft+img.clientWidth/2-d/2)+'px;top:'+(img.offsetTop+img.clientHeight/2-d/2)+'px';
     clearTimeout(ring._t);ring._t=setTimeout(()=>ring.remove(),800);
    });
    bar.addEventListener('click',async e=>{
