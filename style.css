@@ -1,0 +1,60 @@
+/* Duang 果冻：配色跟随酒馆当前主题（--SmartTheme*），没有时用柔和的默认色 */
+:root{
+ --dd-accent:var(--SmartThemeQuoteColor,#e58aa8);
+ --dd-bg:var(--SmartThemeBlurTintColor,#2a2630);
+ --dd-text:var(--SmartThemeBodyColor,#eee);
+ --dd-border:var(--SmartThemeBorderColor,rgba(255,255,255,.22));
+ --dd-muted:var(--SmartThemeEmColor,#aaa);
+}
+
+/* 悬浮球 */
+.dd-ball{position:fixed;z-index:2147482000;width:46px;height:46px;padding:0;border:0;border-radius:50%;background:none;color:var(--dd-accent);cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent;filter:drop-shadow(0 3px 6px rgba(0,0,0,.35));transition:transform .18s cubic-bezier(.3,1.6,.5,1),left .25s ease;opacity:.92}
+.dd-ball svg{display:block;width:100%;height:100%;pointer-events:none}
+.dd-ball:active,.dd-ball.is-dragging{transform:scale(1.12,.9)}
+.dd-ball.is-dragging{transition:none}
+.dd-ball.is-active{animation:dd-bounce 1s ease-in-out infinite;opacity:1;filter:drop-shadow(0 0 8px var(--dd-accent))}
+@keyframes dd-bounce{0%,100%{transform:scale(1,1)}30%{transform:scale(1.1,.9)}60%{transform:scale(.94,1.08)}}
+
+/* 选图模式：盖住整个页面，拦截点击 */
+.dd-pick{position:fixed;inset:0;z-index:2147481000;background:rgba(0,0,0,.18);touch-action:none;cursor:crosshair;-webkit-user-select:none;user-select:none}
+.dd-pick-hint{position:absolute;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;max-width:calc(100vw - 24px);padding:6px 8px 6px 14px;border-radius:999px;background:var(--dd-bg);color:var(--dd-text);border:1px solid var(--dd-border);font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.3);pointer-events:none}
+.dd-pick-exit{all:unset;pointer-events:auto;box-sizing:border-box;min-width:28px;height:28px;border-radius:50%;text-align:center;line-height:28px;cursor:pointer;background:var(--dd-accent);color:#fff;font-size:13px}
+.dd-hl{position:fixed;display:none;box-sizing:border-box;pointer-events:none;border:2px solid var(--dd-accent);border-radius:6px;background:color-mix(in srgb,var(--dd-accent) 18%,transparent);box-shadow:0 0 0 9999px rgba(0,0,0,.28)}
+.dd-toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 90px);transform:translateX(-50%) translateY(10px);z-index:2147483600;padding:8px 14px;border-radius:999px;background:var(--dd-bg);color:var(--dd-text);border:1px solid var(--dd-border);font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:calc(100vw - 32px);box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.dd-toast.is-on{opacity:1;transform:translateX(-50%)}
+
+/* 放大弹窗 */
+dialog.dd-viewer{position:fixed;inset:0;margin:auto;padding:36px 8px 8px;border:1px solid var(--dd-border);border-radius:14px;background:var(--dd-bg);color:var(--dd-text);max-width:calc(100vw - 12px);max-height:calc(100dvh - 12px);overflow:visible;box-shadow:0 10px 40px rgba(0,0,0,.5);width:fit-content;height:fit-content}
+dialog.dd-viewer::backdrop{background:rgba(0,0,0,.7);backdrop-filter:blur(3px)}
+dialog.dd-viewer .dd-stage{position:relative;display:block;line-height:0}
+dialog.dd-viewer img{display:block;max-width:calc(100vw - 28px);max-height:calc(100dvh - 160px);width:auto;height:auto;border-radius:8px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+dialog.dd-viewer .dd-close{all:unset;position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:50%;background:var(--dd-accent);cursor:pointer;display:flex;align-items:center;justify-content:center;box-sizing:border-box}
+dialog.dd-viewer .dd-close svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2.4;stroke-linecap:round;pointer-events:none}
+
+/* 果冻小面板（在弹窗下方） */
+dialog.dd-viewer .dd-jelly-bar{position:absolute;top:100%;left:50%;transform:translateX(-50%);width:max-content;max-width:100vw;margin:10px 0 0;z-index:6;box-sizing:border-box}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-head{display:flex;align-items:center;gap:4px;padding:3px;border-radius:999px;background:color-mix(in srgb,var(--dd-bg) 92%,transparent);border:1px solid var(--dd-border);justify-content:center}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-panel{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);width:max-content;max-width:calc(100vw - 24px);padding:8px 10px;border-radius:14px;background:color-mix(in srgb,var(--dd-bg) 96%,transparent);border:1px solid var(--dd-border);box-shadow:0 4px 18px rgba(0,0,0,.35);display:flex;flex-direction:column;gap:6px;box-sizing:border-box}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-panel[hidden]{display:none}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-row{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-row b{font-size:12px;min-width:34px;color:var(--dd-muted);font-weight:600}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-hint{font-size:11px;font-style:normal;color:var(--dd-muted);flex-basis:100%;padding-left:38px}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-msg{font-size:11px;color:var(--dd-muted);max-width:260px}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-msg:empty{display:none}
+dialog.dd-viewer .dd-jelly-bar button{all:unset;box-sizing:border-box;display:inline-block;min-width:46px;padding:4px 12px;border-radius:999px;font-size:12px;line-height:1.4;text-align:center;white-space:nowrap;color:var(--dd-text);cursor:pointer;-webkit-tap-highlight-color:transparent;border:1px solid var(--dd-border)}
+dialog.dd-viewer .dd-jelly-bar button[hidden]{display:none}
+dialog.dd-viewer .dd-jelly-bar button.is-active{background:var(--dd-accent);color:#fff;border-color:transparent}
+dialog.dd-viewer .dd-jelly-bar button.is-active[data-jb-scope]::before,dialog.dd-viewer .dd-jelly-bar button.is-active[data-jb-in]::before{content:"✓ "}
+dialog.dd-viewer .dd-jelly-bar.is-off .dd-jb-head button:not([data-jb=power]){opacity:.45}
+dialog.dd-viewer .dd-jelly-bar.is-selecting .dd-jb-head{border-color:var(--dd-accent)}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-head button[data-jb-tool],dialog.dd-viewer .dd-jelly-bar .dd-jb-head button[data-jb=clr],dialog.dd-viewer .dd-jelly-bar .dd-jb-head button[data-jb=done]{min-width:40px;padding:5px 10px;display:inline-flex;align-items:center;justify-content:center}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-head button[hidden]{display:none}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-head svg{display:block;pointer-events:none}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-brush{display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap;padding:0 6px;color:var(--dd-text)}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-brush[hidden]{display:none}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-brush svg{opacity:.7}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-brush input{width:84px;accent-color:var(--dd-accent)}
+
+/* 设置面板里的小排版 */
+#dd-settings .dd-set-row{display:flex;align-items:center;gap:8px;margin:6px 0}
+#dd-settings small{display:block;opacity:.7;margin-top:6px}
