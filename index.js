@@ -433,7 +433,10 @@ function ddOpenViewer(url){
   dlg=document.createElement('dialog');dlg.className='dd-viewer';dlg.setAttribute('aria-label','果冻放大图');
   dlg.innerHTML='<button type="button" class="dd-close" aria-label="关闭" title="关闭"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button><div class="dd-stage"><img alt="放大查看的图片" draggable="false"></div>';
   const bar=ddBuildBar(dlg);dlg.append(bar);
-  dlg.addEventListener('click',e=>{if(e.target===dlg||e.target.closest('.dd-close')){if(dlg.open)dlg.close();else dlg.removeAttribute('open');}});
+  dlg.addEventListener('click',e=>{
+   // 手指抬起后系统会补发一个 click，落在刚打开的弹窗上，会被当成点了背景而立刻关掉；打开后短时间内忽略点背景。
+   if(e.target===dlg&&Date.now()-(dlg._ddOpenedAt||0)<600)return;
+   if(e.target===dlg||e.target.closest('.dd-close')){if(dlg.open)dlg.close();else dlg.removeAttribute('open');}});
   dlg.addEventListener('close',()=>{dlg.querySelector('img')?.removeAttribute('src');dlg.querySelector('img')?._ddJellyAbort?.abort();ddOnViewerClosed();});
   document.body.append(dlg);
  }
@@ -441,6 +444,7 @@ function ddOpenViewer(url){
  img.src=url;
  ddJellyClearSelection(img);{const p=dlg.querySelector('.dd-jb-panel');if(p)p.hidden=true;}dlg._ddMsg?.('');
  ddAttachJelly(img);dlg._ddPaintBar?.();
+ dlg._ddOpenedAt=Date.now();
  if(!dlg.open){if(typeof dlg.showModal==='function')dlg.showModal();else{dlg.setAttribute('open','');dlg.style.position='fixed';}}
 }
 function ddOnViewerClosed(){if(ddPicking)ddShowPickUi(true);}
@@ -454,8 +458,18 @@ function ddBgUrl(el){
  const r=el.getBoundingClientRect();if(r.width*r.height>.9*win.innerWidth*win.innerHeight)return '';
  try{return new URL(m[2],el.ownerDocument.baseURI).href;}catch{return m[2];}
 }
+function ddFlatList(root,x,y,depth=0){
+ // elementsFromPoint 不会钻进 shadow DOM，这里把开着的 shadowRoot 里的元素也展开出来（上层在前）
+ let list=[];try{list=root.elementsFromPoint(x,y);}catch{}
+ const out=[];
+ for(const el of list){
+  if(el.shadowRoot&&depth<4){try{out.push(...ddFlatList(el.shadowRoot,x,y,depth+1));}catch{}}
+  out.push(el);
+ }
+ return out;
+}
 function ddFindAt(x,y,doc=document,ox=0,oy=0,depth=0){
- let list=[];try{list=doc.elementsFromPoint(x,y);}catch{}
+ const list=ddFlatList(doc,x,y);
  for(const el of list){
   if(el.closest?.('.dd-pick,.dd-ball,.dd-viewer,.dd-hl,.dd-toast'))continue;
   const tag=el.tagName;
@@ -476,7 +490,11 @@ async function ddMaterialize(url){
  if(!url)return '';
  if(/^(data|blob):/i.test(url))return url;
  try{if(new URL(url,location.href).origin===location.origin)return url;}catch{return url;}
- try{const r=await fetch(url,{mode:'cors'});if(!r.ok)throw new Error('bad');return URL.createObjectURL(await r.blob());}catch{return url;}
+ try{
+  const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),3000);
+  const r=await fetch(url,{mode:'cors',signal:ctl.signal});clearTimeout(t);
+  if(!r.ok)throw new Error('bad');return URL.createObjectURL(await r.blob());
+ }catch{return url;}
 }
 async function ddSourceOf(hit){
  if(hit.kind==='img')return ddMaterialize(hit.el.currentSrc||hit.el.src);
@@ -501,37 +519,62 @@ function ddHighlight(hit){
  const r=hit.el.getBoundingClientRect();
  hl.style.cssText='display:block;left:'+(r.left+hit.ox)+'px;top:'+(r.top+hit.oy)+'px;width:'+r.width+'px;height:'+r.height+'px';
 }
+function ddDescribe(x,y){
+ try{
+  const names=[];
+  for(const el of ddFlatList(document,x,y)){
+   if(el.closest?.('.dd-pick,.dd-ball,.dd-hl'))continue;
+   names.push(el.tagName.toLowerCase()+(el.id?'#'+el.id:'')+(typeof el.className==='string'&&el.className?'.'+el.className.trim().split(/\s+/)[0]:''));
+   if(names.length>=3)break;
+  }
+  return names.join(' > ')||'空白';
+ }catch{return '?';}
+}
+async function ddHandleTap(x,y){
+ try{
+  const hit=ddFindAt(x,y);
+  if(!hit){ddToast('这里没有找到图片（点到的是：'+ddDescribe(x,y)+'）');return;}
+  ddToast('识别到图片，正在打开…');
+  const url=await ddSourceOf(hit);
+  if(!url){ddToast('这张图抓不到（可能被浏览器保护了）');return;}
+  ddShowPickUi(false);ddOpenViewer(url);
+ }catch(err){
+  console.warn('[duangduang] 选图失败',err);
+  ddToast('选图出错：'+((err&&err.message)||err));
+ }
+}
 function ddEnterPick(){
  if(ddPicking)return;
  ddPicking=true;document.querySelector('.dd-ball')?.classList.add('is-active');
  const root=document.createElement('div');root.className='dd-pick';
  root.innerHTML='<div class="dd-pick-hint"><span>点一张图片，把它放大来玩</span><button type="button" class="dd-pick-exit" aria-label="退出选图">✕</button></div><div class="dd-hl"></div>';
  const hl=root.querySelector('.dd-hl');
- ddPickUi={root,hl};
- let raf=0,last=null;
- const probe=e=>{
-  last=e;if(raf)return;
-  raf=requestAnimationFrame(()=>{raf=0;ddHighlight(ddFindAt(last.clientX,last.clientY));});
+ let raf=0,last=null,down=null;
+ const inRoot=e=>!!ddPickUi&&ddPickUi.root.contains(e.target);
+ const probe=e=>{last=e;if(raf)return;raf=requestAnimationFrame(()=>{raf=0;ddHighlight(ddFindAt(last.clientX,last.clientY));});};
+ // 挂在 window 的捕获阶段：比页面上别的插件先收到事件，避免被它们拦掉
+ const onMove=e=>{if(inRoot(e))probe(e);};
+ const onDown=e=>{if(!inRoot(e))return;down={x:e.clientX,y:e.clientY,exit:!!e.target.closest('.dd-pick-exit')};if(!down.exit)probe(e);e.preventDefault();e.stopPropagation();};
+ const onUp=e=>{
+  if(!down||!inRoot(e))return;
+  const d=down;down=null;e.preventDefault();e.stopPropagation();
+  if(Math.hypot(e.clientX-d.x,e.clientY-d.y)>14)return;
+  if(d.exit&&e.target.closest('.dd-pick-exit')){ddExitPick();return;}
+  if(d.exit)return;
+  ddHandleTap(e.clientX,e.clientY);
  };
- root.addEventListener('pointermove',probe);
- root.addEventListener('pointerdown',e=>{if(e.target.closest('.dd-pick-exit'))return;probe(e);});
- root.addEventListener('click',async e=>{
-  e.preventDefault();e.stopPropagation();
-  if(e.target.closest('.dd-pick-exit')){ddExitPick();return;}
-  const hit=ddFindAt(e.clientX,e.clientY);
-  if(!hit){ddToast('这里没有找到图片，换个地方点点看');return;}
-  const url=await ddSourceOf(hit);
-  if(!url){ddToast('这张图抓不到（可能被浏览器保护了）');return;}
-  ddShowPickUi(false);ddOpenViewer(url);
- },true);
- for(const ev of ['touchstart','touchmove','contextmenu'])root.addEventListener(ev,e=>{if(ev==='contextmenu')e.preventDefault();},{passive:true});
+ const onClick=e=>{if(inRoot(e)){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();}};
+ const onCtx=e=>{if(inRoot(e))e.preventDefault();};
+ const evs=[['pointermove',onMove],['pointerdown',onDown],['pointerup',onUp],['click',onClick],['contextmenu',onCtx]];
+ for(const [n,f] of evs)window.addEventListener(n,f,true);
+ ddPickUi={root,hl,cleanup:()=>{for(const [n,f] of evs)window.removeEventListener(n,f,true);cancelAnimationFrame(raf);}};
  document.body.append(root);
  document.addEventListener('keydown',ddPickKey,true);
 }
 function ddPickKey(e){if(e.key==='Escape'&&ddPicking&&!document.querySelector('dialog.dd-viewer[open]')){e.stopPropagation();ddExitPick();}}
 function ddExitPick(){
  ddPicking=false;document.querySelector('.dd-ball')?.classList.remove('is-active');
- ddPickUi?.root.remove();ddPickUi=null;document.removeEventListener('keydown',ddPickKey,true);
+ ddPickUi?.cleanup?.();ddPickUi?.root.remove();ddPickUi=null;document.removeEventListener('keydown',ddPickKey,true);
 }
 
 // ===== 悬浮球 =====
