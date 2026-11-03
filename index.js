@@ -550,26 +550,34 @@ function ddEnterPick(){
  root.innerHTML='<div class="dd-pick-hint"><span>点一张图片，把它放大来玩</span><button type="button" class="dd-pick-exit" aria-label="退出选图">✕</button></div><div class="dd-hl"></div>';
  const hl=root.querySelector('.dd-hl');
  let raf=0,last=null,down=null;
- const inRoot=e=>!!ddPickUi&&ddPickUi.root.contains(e.target);
+ const ours=e=>!!(e.target&&e.target.closest&&e.target.closest('.dd-ball,.dd-viewer,.dd-toast'));
  const probe=e=>{last=e;if(raf)return;raf=requestAnimationFrame(()=>{raf=0;ddHighlight(ddFindAt(last.clientX,last.clientY));});};
- // 挂在 window 的捕获阶段：比页面上别的插件先收到事件，避免被它们拦掉
- const onMove=e=>{if(inRoot(e))probe(e);};
- const onDown=e=>{if(!inRoot(e))return;down={x:e.clientX,y:e.clientY,exit:!!e.target.closest('.dd-pick-exit')};if(!down.exit)probe(e);e.preventDefault();e.stopPropagation();};
+ // 选图模式下，在 window 的捕获阶段把所有不属于拾取层、悬浮球和弹窗的点击 / 触摸全部拦下，
+ // 这样即使别的元素盖在上面，酒馆原本的点击行为（比如点头像放大）也不会被触发。
+ const block=e=>{if(ours(e))return false;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();return true;};
+ const onMove=e=>{if(!ours(e))probe(e);};
+ const onDown=e=>{
+  if(ours(e))return;
+  down={x:e.clientX,y:e.clientY,exit:!!(e.target.closest&&e.target.closest('.dd-pick-exit'))};
+  if(!down.exit)probe(e);
+  block(e);
+ };
  const onUp=e=>{
-  if(!down||!inRoot(e))return;
-  const d=down;down=null;e.preventDefault();e.stopPropagation();
+  if(ours(e))return;
+  const d=down;down=null;block(e);
+  if(!d)return;
   if(Math.hypot(e.clientX-d.x,e.clientY-d.y)>14)return;
-  if(d.exit&&e.target.closest('.dd-pick-exit')){ddExitPick();return;}
-  if(d.exit)return;
+  if(d.exit){ddExitPick();return;}
   ddHandleTap(e.clientX,e.clientY);
  };
- const onClick=e=>{if(inRoot(e)){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();}};
- const onCtx=e=>{if(inRoot(e))e.preventDefault();};
- const evs=[['pointermove',onMove],['pointerdown',onDown],['pointerup',onUp],['click',onClick],['contextmenu',onCtx]];
- for(const [n,f] of evs)window.addEventListener(n,f,true);
- ddPickUi={root,hl,cleanup:()=>{for(const [n,f] of evs)window.removeEventListener(n,f,true);cancelAnimationFrame(raf);}};
+ const onOther=e=>{block(e);};
+ const evs=[['pointermove',onMove,{capture:true}],['pointerdown',onDown,{capture:true}],['pointerup',onUp,{capture:true}]];
+ for(const n of ['mousedown','mouseup','click','dblclick','auxclick','contextmenu','touchstart','touchend'])evs.push([n,onOther,{capture:true,passive:false}]);
+ for(const [n,f,o] of evs)window.addEventListener(n,f,o);
+ ddPickUi={root,hl,cleanup:()=>{for(const [n,f,o] of evs)window.removeEventListener(n,f,o);cancelAnimationFrame(raf);}};
  document.body.append(root);
  document.addEventListener('keydown',ddPickKey,true);
+ ddToast('选图模式已开：点一张图片');
 }
 function ddPickKey(e){if(e.key==='Escape'&&ddPicking&&!document.querySelector('dialog.dd-viewer[open]')){e.stopPropagation();ddExitPick();}}
 function ddExitPick(){
