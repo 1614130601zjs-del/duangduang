@@ -1,7 +1,7 @@
 // Duang 果冻（duangduang）—— 悬浮球 + 选图 + 放大弹窗 + 果冻互动。
 // 点悬浮球进入选图模式，点任意一张图（普通图 / canvas / 背景图 / 同源 iframe 里的图），会把它复制一份到自己的弹窗里玩，不改动原图，也不会被别的插件重绘冲掉。
 import { extension_settings } from '/scripts/extensions.js';
-import { saveSettingsDebounced } from '/script.js';
+import { saveSettingsDebounced, getRequestHeaders } from '/script.js';
 
 const EXT='duangduang';
 const defaults={ballOn:true,ballX:1,ballY:.62,ballShake:true,ballIcon:'default',ballIconPicked:false,ballFixed:26,ballCustoms:[],ballSize:56,jellyOn:true,jellyScope:'local',jellyTap:false,jellyDrag:true,jellyShake:false,jellyStrength:'mid',jellyBrush:.075};
@@ -622,15 +622,42 @@ let ddRefreshTick=0;
 async function ddRefreshBall(){
  const ball=document.querySelector('.dd-ball');if(!ball)return;
  const my=++ddRefreshTick;
- const size=Math.max(28,Math.min(120,Number(ddCfg().ballSize)||56));
+ const size=Math.max(28,Math.min(200,Number(ddCfg().ballSize)||56));
  const [w,h]=await ddMeasure(ddIconSrc());
  if(my!==ddRefreshTick||!document.body.contains(ball))return;
  const k=size/Math.max(w,h);
  ball.style.setProperty('--dd-ball-w',Math.round(w*k)+'px');ball.style.setProperty('--dd-ball-h',Math.round(h*k)+'px');
  ball.innerHTML=ddBallHtml();ddPlaceBall(ball);
 }
-// 上传的图缩到 128px 以内再存，避免把设置文件撑大
-function ddReadIcon(file){
+// 上传：优先把原图原样传到酒馆的用户文件目录（不压缩、不撑大设置文件，动图也保留）；传不上去时才退回存进设置里。
+function ddFileToDataUrl(file){
+ return new Promise((res,rej)=>{const fr=new FileReader();fr.onerror=()=>rej(new Error('读取失败'));fr.onload=()=>res(String(fr.result));fr.readAsDataURL(file);});
+}
+async function ddUploadIcon(file){
+ const dataUrl=await ddFileToDataUrl(file);
+ const m=/^data:([^;,]+)[^,]*;base64,(.*)$/s.exec(dataUrl);
+ if(!m||!/^image\//.test(m[1]))throw new Error('这不是图片文件');
+ const ext=({'image/png':'png','image/gif':'gif','image/webp':'webp','image/jpeg':'jpg','image/svg+xml':'svg','image/apng':'png','image/avif':'avif'})[m[1]]||'png';
+ const name='duang_icon_'+Date.now().toString(36)+'.'+ext;
+ try{
+  const r=await fetch('/api/files/upload',{method:'POST',headers:getRequestHeaders(),body:JSON.stringify({name,data:m[2]})});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const j=await r.json();const path=String(j.path||'').replace(/^\/+/,'');
+  if(!path)throw new Error('没有返回路径');
+  return {url:'/'+path.split('/').map(encodeURIComponent).join('/'),path,server:true,fallback:false};
+ }catch(err){
+  console.warn('[duangduang] 上传到酒馆文件目录失败，改存进设置',err);
+  if(file.size<=1.5*1024*1024)return {url:dataUrl,server:false,fallback:'orig'};
+  return {url:await ddReadIcon(file,512),server:false,fallback:'small'};
+ }
+}
+async function ddDeleteIconFile(it){
+ if(!it||!it.server||!it.path)return;
+ try{await fetch('/api/files/delete',{method:'POST',headers:getRequestHeaders(),body:JSON.stringify({path:it.path})});}catch{}
+}
+// 退路：缩小后存进设置
+
+function ddReadIcon(file,max=128){
  return new Promise((res,rej)=>{
   const fr=new FileReader();
   fr.onerror=()=>rej(new Error('读取失败'));
@@ -638,7 +665,7 @@ function ddReadIcon(file){
    const im=new Image();
    im.onerror=()=>rej(new Error('这不是能显示的图片'));
    im.onload=()=>{
-    const k=Math.min(1,128/Math.max(im.naturalWidth,im.naturalHeight,1)),w=Math.max(1,Math.round(im.naturalWidth*k)),h=Math.max(1,Math.round(im.naturalHeight*k));
+    const k=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight,1)),w=Math.max(1,Math.round(im.naturalWidth*k)),h=Math.max(1,Math.round(im.naturalHeight*k));
     const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(im,0,0,w,h);
     res(cv.toDataURL('image/png'));
    };
@@ -726,9 +753,9 @@ function ddMountSettings(){
   +'<label class="checkbox_label"><input id="dd-ball-shake" type="checkbox"><span>手机摇晃时悬浮球也跟着晃</span></label>'
   +'<div class="dd-set-row"><label for="dd-strength">弹性</label><select id="dd-strength" class="text_pole"><option value="soft">软糯</option><option value="mid">Q弹</option><option value="bouncy">DUANG</option></select></div>'
   +'<div class="dd-set-row"><label>悬浮球图标</label></div><div id="dd-icons" class="dd-icons"></div>'
-  +'<small class="dd-note">换图标建议用<b>透明底的 PNG</b>，不然悬浮球会带着一块底色。上传后会自动缩到 128px 以内。</small>'
+  +'<small class="dd-note">换图标建议用<b>透明底的 PNG</b>，不然悬浮球会带着一块底色。上传的是<b>原图，不压缩</b>（保存在酒馆的用户文件里），GIF / 动图 WebP 也能动。</small>'
   +'<div class="dd-set-row"><input id="dd-icon-upload" type="button" class="menu_button" value="上传图片"><input id="dd-icon-reset" type="button" class="menu_button" value="恢复默认图标"><input id="dd-icon-file" type="file" accept="image/*" hidden></div>'
-  +'<div class="dd-set-row"><label for="dd-size">大小</label><input id="dd-size" type="range" min="28" max="120" step="2"><span id="dd-size-v"></span></div><div class="dd-set-row"><label for="dd-fixed">底部固定</label><input id="dd-fixed" type="range" min="0" max="70" step="2"><span id="dd-fixed-v"></span></div><small class="dd-note">摇晃手机时，图标下面这一段不动，只有上面摇，更像果冻。0 = 只固定最底边。</small><small id="dd-icon-msg"></small>'
+  +'<div class="dd-set-row"><label for="dd-size">大小</label><input id="dd-size" type="range" min="28" max="200" step="2"><span id="dd-size-v"></span></div><div class="dd-set-row"><label for="dd-fixed">底部固定</label><input id="dd-fixed" type="range" min="0" max="70" step="2"><span id="dd-fixed-v"></span></div><small class="dd-note">摇晃手机时，图标下面这一段不动，只有上面摇，更像果冻。0 = 只固定最底边。</small><small id="dd-icon-msg"></small>'
   +'<div class="dd-set-row"><input id="dd-ball-reset" type="button" class="menu_button" value="重置悬浮球位置"></div>'
   +'<small>点悬浮球进入选图模式，再点任意一张图，就会放大到弹窗里玩果冻。范围、选区、交互（点击 / 拖动 / 摇晃）都在弹窗下方的小面板里。</small></div></div>';
  host.append(box);
@@ -754,7 +781,7 @@ function ddMountSettings(){
   if(del){
    // 两次点击才删：第一次变红提示，第二次真的删掉
    if(del.dataset.armed!=='1'){del.dataset.armed='1';del.classList.add('is-armed');del.textContent='删?';setTimeout(()=>{if(del.isConnected){del.dataset.armed='';del.classList.remove('is-armed');del.textContent='×';}},2600);return;}
-   const k=ddCfg();k.ballCustoms=k.ballCustoms.filter(x=>x.id!==del.dataset.del);
+   const k=ddCfg();ddDeleteIconFile(k.ballCustoms.find(x=>x.id===del.dataset.del));k.ballCustoms=k.ballCustoms.filter(x=>x.id!==del.dataset.del);
    if(k.ballIcon==='custom:'+del.dataset.del){k.ballIcon=DD_BUILTIN_ICONS[0]||'default';k.ballIconPicked=true;}
    ddSave();paintIcons();ddRefreshBall();msg.textContent='已删除';return;
   }
@@ -766,19 +793,39 @@ function ddMountSettings(){
   try{
    const k=ddCfg();
    if(k.ballCustoms.length>=8){msg.textContent='最多存 8 张，请先删掉不用的（图标右上角的 ×）';return;}
-   const url=await ddReadIcon(f);const id='u'+Date.now().toString(36);
-   k.ballCustoms.push({id,url});k.ballIcon='custom:'+id;k.ballIconPicked=true;ddSave();paintIcons();ddRefreshBall();msg.textContent='已换成你上传的图片';
+   if(f.size>10*1024*1024){msg.textContent='图片太大了（超过 10MB），请换一张小一点的';return;}
+   msg.textContent='上传中…';
+   const up=await ddUploadIcon(f);const id='u'+Date.now().toString(36);
+   k.ballCustoms.push({id,url:up.url,path:up.path||'',server:!!up.server});k.ballIcon='custom:'+id;k.ballIconPicked=true;ddSave();paintIcons();ddRefreshBall();msg.textContent=up.server?'已换成你上传的图片（原图，未压缩）':(up.fallback==='orig'?'酒馆文件目录用不了，已把原图存进设置里':'酒馆文件目录用不了，图片较大，已缩小到 512px 存进设置里');
   }
   catch(err){msg.textContent='上传失败：'+((err&&err.message)||err);}
  };
  box.querySelector('#dd-icon-reset').onclick=()=>{const k=ddCfg();k.ballIcon='default';k.ballIconPicked=true;ddSave();paintIcons();ddRefreshBall();msg.textContent='';};
  const sz=box.querySelector('#dd-size'),szv=box.querySelector('#dd-size-v');
- sz.value=String(Math.max(28,Math.min(120,Number(c.ballSize)||56)));szv.textContent=sz.value+'px';
+ sz.value=String(Math.max(28,Math.min(200,Number(c.ballSize)||56)));szv.textContent=sz.value+'px';
  {const fx=box.querySelector('#dd-fixed'),fv=box.querySelector('#dd-fixed-v');fx.value=String(Math.max(0,Math.min(70,Number(c.ballFixed)||0)));fv.textContent=fx.value+'%';fx.oninput=()=>{fv.textContent=fx.value+'%';ddCfg().ballFixed=Number(fx.value);ddSave();ddRefreshBall();};}
  sz.oninput=()=>{szv.textContent=sz.value+'px';ddCfg().ballSize=Number(sz.value);ddSave();ddRefreshBall();};
  box.querySelector('#dd-ball-reset').onclick=()=>{const k=ddCfg();k.ballX=1;k.ballY=.62;ddSave();const b=document.querySelector('.dd-ball');if(b)ddPlaceBall(b);};
  return true;
 }
+
+// ===== 对外接口：别的插件可以直接把图片交给果冻弹窗打开 =====
+// 用法：window.DuangDuang?.openImage('/backgrounds/xxx.png')，返回 Promise<boolean>（true=已打开）。
+// 同源路径、data:、blob:、http(s) 地址都可以；同源图片可以用局部 / 选区 / 摇晃的全部效果。
+window.DuangDuang={
+ version:'0.4.0',
+ ready:true,
+ async openImage(src){
+  try{
+   const url=await ddMaterialize(String(src||'').trim());
+   if(!url)return false;
+   ddOpenViewer(url);return true;
+  }catch(err){console.warn('[duangduang] openImage 失败',err);return false;}
+ },
+ close(){const d=document.querySelector('dialog.dd-viewer[open]');if(d){d.close();return true;}return false;},
+ isOpen(){return !!document.querySelector('dialog.dd-viewer[open]');}
+};
+try{document.dispatchEvent(new CustomEvent('duangduang:ready',{detail:{version:window.DuangDuang.version}}));}catch{}
 
 function ddInit(){
  if(window.__duangduangReady)return;window.__duangduangReady=true;
