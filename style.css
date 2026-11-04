@@ -8,7 +8,7 @@
 }
 
 /* 悬浮球 */
-.dd-ball{position:fixed;z-index:2147482000;width:var(--dd-ball-size,46px);height:var(--dd-ball-size,46px);padding:0;border:0;border-radius:50%;background:none;color:var(--dd-accent);cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent;filter:drop-shadow(0 3px 6px rgba(0,0,0,.35));transition:transform .18s cubic-bezier(.3,1.6,.5,1),left .25s ease;opacity:.92}
+.dd-ball{position:fixed;z-index:2147482000;width:var(--dd-ball-w,56px);height:var(--dd-ball-h,56px);padding:0;border:0;border-radius:50%;background:none;color:var(--dd-accent);cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent;filter:drop-shadow(0 3px 6px rgba(0,0,0,.35));transition:transform .18s cubic-bezier(.3,1.6,.5,1),left .25s ease;opacity:.92}
 .dd-ball svg,.dd-ball img{display:block;width:100%;height:100%;pointer-events:none;object-fit:contain;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .dd-ball:active,.dd-ball.is-dragging{transform:scale(1.06,.95)}
 .dd-ball.is-dragging{transition:none}
@@ -71,3 +71,6 @@ dialog.dd-viewer .dd-jelly-bar .dd-jb-dd-list[hidden]{display:none}
 dialog.dd-viewer .dd-jelly-bar .dd-jb-dd-list button{text-align:left;display:block;border-radius:8px}
 dialog.dd-viewer .dd-jelly-bar .dd-jb-panel.is-dd-open{padding-bottom:118px}
 #dd-settings .dd-note{display:block;opacity:.75;margin:2px 0 6px}
+
+.dd-ball .dd-bl{position:absolute;left:0;top:0;width:100%;height:100%;display:block;pointer-events:none}
+.dd-ball .dd-bl svg,.dd-ball .dd-bl img{width:100%;height:100%}
