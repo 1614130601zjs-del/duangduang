@@ -79,3 +79,7 @@ dialog.dd-viewer .dd-jelly-bar .dd-jb-panel.is-dd-open{padding-bottom:118px}
 #dd-settings .dd-icon-del{all:unset;position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:rgba(0,0,0,.65);color:#fff;font-size:12px;line-height:18px;text-align:center;cursor:pointer}
 #dd-settings .dd-icon-del.is-armed{background:#e0446a;font-size:11px}
 .dd-ball .dd-cv{position:absolute;display:block;pointer-events:none;width:auto;height:auto}
+.dd-ball img.dd-gif{object-fit:contain;pointer-events:none;-webkit-user-select:none;user-select:none}
+#dd-settings .dd-icon-opt{position:relative}
+#dd-settings .dd-icon-opt.is-on{border-color:var(--dd-accent);background:color-mix(in srgb,var(--dd-accent) 16%,transparent);box-shadow:0 0 0 2px color-mix(in srgb,var(--dd-accent) 35%,transparent)}
+#dd-settings .dd-icon-opt.is-on::after{content:"✓";position:absolute;right:-5px;bottom:-5px;width:16px;height:16px;border-radius:50%;background:var(--dd-accent);color:#fff;font-size:11px;line-height:16px;text-align:center;font-weight:700}

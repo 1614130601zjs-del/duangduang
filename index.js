@@ -21,6 +21,7 @@ const ddSave=()=>{try{saveSettingsDebounced();}catch{}};
 // ===== 放大图小互动（果冻）：范围（局部 / 抹开 / 全屏）× 选区（可选）× 交互（点击 / 拖动 / 摇晃） =====
 // 弹簧动画只在触摸 / 拖动 / 摇晃时跑，松手停稳后自动结束；选区只在放大图打开期间保留。
 const DD_JELLY_MW=48,DD_JELLY_MH=48;
+function ddJellyReach(){const r=Number(ddCfg().jellyReach);return Number.isFinite(r)&&r>0?Math.max(.4,Math.min(2.2,r)):1;}
 function ddJellyCfg(){
  const c=ddCfg();
  if(typeof c.jellyOn!=='boolean'){
@@ -31,7 +32,7 @@ function ddJellyCfg(){
  if(typeof c.jellyTap!=='boolean')c.jellyTap=true;
  if(typeof c.jellyDrag!=='boolean')c.jellyDrag=true;
  if(typeof c.jellyShake!=='boolean')c.jellyShake=false;
- return {on:c.jellyOn,scope:['smudge','whole'].includes(c.jellyScope)?c.jellyScope:'local',tap:false,drag:c.jellyDrag,shake:c.jellyShake,amp:{soft:.35,mid:.5,bouncy:.65}[c.jellyStrength]||.5};
+ return {on:c.jellyOn,scope:['smudge','whole'].includes(c.jellyScope)?c.jellyScope:'local',tap:false,drag:c.jellyDrag,shake:c.jellyShake,amp:{soft:.35,mid:.5,bouncy:.65}[c.jellyStrength]||.5,reach:ddJellyReach()};
 }
 function ddJellyBrush(){const b=Number(ddCfg().jellyBrush);return Number.isFinite(b)&&b>0?Math.max(.02,Math.min(.2,b)):.075;}
 function ddJellyState(img){
@@ -156,7 +157,7 @@ function ddAttachJelly(img){
   }catch(e){failed=true;destroy();console.warn('[拾帧] 局部果冻不可用，改用整图弹动',e);return false;}
  };
  const draw=()=>{
-  const m=Math.min(boxW,boxH),R=.17*m,R2=.22*m,RR=R*R,RR2=R2*R2,shAmp=.05*m*amp;
+  const m=Math.min(boxW,boxH),R=.17*m*ddJellyReach(),R2=.22*m*ddJellyReach(),RR=R*R,RR2=R2*R2,shAmp=.05*m*amp;
   const useLocal=scope!=='whole',useAff=scope==='whole';
   const [tx,ty,sx,sy,rot]=aff.x,cr=Math.cos(rot*Math.PI/180),sr=Math.sin(rot*Math.PI/180),mx0=boxW/2,my0=boxH/2;
   const shOn=Math.abs(shk.x)>.0005||Math.abs(shk.y)>.0005;
@@ -372,6 +373,7 @@ function ddBuildBar(overlay){
     +'<div class="dd-jb-row"><b>选区</b><button type="button" data-jb="sel">✎ 涂选区</button><button type="button" data-jb="clr2">清除</button><em class="dd-jb-hint"></em></div>'
     +'<div class="dd-jb-row"><b>交互</b><button type="button" data-jb-in="drag">拖动</button><button type="button" data-jb-in="shake">摇晃</button>'
     +'<span class="dd-jb-dd"><button type="button" class="dd-jb-dd-btn" data-jb-dd aria-haspopup="listbox" aria-expanded="false"><span data-jb-dd-label>Q弹</span> ▾</button><span class="dd-jb-dd-list" role="listbox" hidden><button type="button" role="option" data-jb-strength="soft">软糯</button><button type="button" role="option" data-jb-strength="mid">Q弹</button><button type="button" role="option" data-jb-strength="bouncy">DUANG</button></span></span></div>'
+    +'<div class="dd-jb-row"><b>反馈</b><span class="dd-jb-brush dd-jb-reach"><small>小</small><input type="range" min="40" max="220" step="5" data-jb-reach aria-label="反馈范围"><small>大</small></span><em class="dd-jb-hint">手指按下去影响多大一块</em></div>'
     +'<div class="dd-jb-msg" role="status"></div></div>';
    const $b=sel=>bar.querySelector(sel);
    const setMsg=t=>{$b('.dd-jb-msg').textContent=t||'';};
@@ -381,6 +383,7 @@ function ddBuildBar(overlay){
     bar.classList.toggle('is-off',!c.on);bar.classList.toggle('is-selecting',!!S.selecting);
     bar.querySelectorAll('[data-jb-scope]').forEach(b=>b.classList.toggle('is-active',b.dataset.jbScope===c.scope));
     const ins={tap:c.tap,drag:c.drag,shake:c.shake};const stv=['soft','bouncy'].includes(ddCfg().jellyStrength)?ddCfg().jellyStrength:'mid';bar.querySelectorAll('[data-jb-strength]').forEach(b=>b.classList.toggle('is-active',b.dataset.jbStrength===stv));{const lab=$b('[data-jb-dd-label]');if(lab)lab.textContent={soft:'软糯',mid:'Q弹',bouncy:'DUANG'}[stv];}bar.querySelectorAll('[data-jb-in]').forEach(b=>b.classList.toggle('is-active',!!ins[b.dataset.jbIn]));
+    {const ri=$b('[data-jb-reach]');if(ri&&document.activeElement!==ri)ri.value=Math.round(ddJellyReach()*100);}
     $b('[data-jb=sel]').classList.toggle('is-active',!!S.selecting);
     $b('.dd-jb-hint').textContent=S.has?'已选区（只有选中的地方会动）':'未选区（整张图都会动）';
     $b('.dd-jb-brush').hidden=!S.selecting;bar.querySelectorAll('[data-jb-tool]').forEach(t=>{t.hidden=!S.selecting;t.classList.toggle('is-active',(S.tool||'add')===t.dataset.jbTool);});$b('[data-jb=power]').hidden=!!S.selecting;{const bi=$b('[data-jb-brush]');if(bi&&document.activeElement!==bi)bi.value=String(Math.round(ddJellyBrush()*100));}
@@ -391,6 +394,13 @@ function ddBuildBar(overlay){
    const syncSettings=()=>{const sel=document.querySelector('#dd-strength');if(sel)sel.value=['soft','bouncy'].includes(ddCfg().jellyStrength)?ddCfg().jellyStrength:'mid';};
    const rebind=()=>{ddAttachJelly(overlay.querySelector('img'));paintBar();syncSettings();};
    bar.addEventListener('input',e=>{
+    const rr=e.target.closest('[data-jb-reach]');
+    if(rr){e.stopPropagation();ddCfg().jellyReach=Number(rr.value)/100;ddSave();
+     const img=overlay.querySelector('img'),host=img&&(img.offsetParent||img.parentElement);if(!host)return;
+     let ring=host.querySelector('.dd-jb-ring');if(!ring){ring=document.createElement('div');ring.className='dd-jb-ring';host.appendChild(ring);}
+     const d=2*.19*ddJellyReach()*Math.min(img.clientWidth,img.clientHeight);
+     ring.style.cssText='position:absolute;pointer-events:none;z-index:4;border-radius:50%;border:2px dashed #ff4081;background:rgba(255,64,129,.18);width:'+d+'px;height:'+d+'px;left:'+(img.offsetLeft+img.clientWidth/2-d/2)+'px;top:'+(img.offsetTop+img.clientHeight/2-d/2)+'px';
+     clearTimeout(ring._t);ring._t=setTimeout(()=>ring.remove(),800);return;}
     const bi=e.target.closest('[data-jb-brush]');if(!bi)return;e.stopPropagation();
     ddCfg().jellyBrush=Number(bi.value)/100;ddSave();
     // 临时画一个圈让你看到当前粗细
@@ -609,8 +619,15 @@ function ddIconSrc(){const c=ddCfg();{const u=ddCustomUrl(c.ballIcon);if(u)retur
 function ddBallHtml(){return '<canvas class="dd-bl dd-cv"></canvas>';}
 let ddCv=null;
 function ddSvgSrc(){return 'data:image/svg+xml;utf8,'+encodeURIComponent(DD_BALL_SVG.replace('<svg ','<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" '));}
+function ddIsGif(u){return /^data:image\/gif/i.test(u||'')||/\.gif(\?|#|$)/i.test(u||'');}
 function ddSetupCanvas(ball){
  const cv=ball.querySelector('canvas.dd-cv');if(!cv)return;
+ const src0=ddIconSrc();
+ // 动图（gif）画布只能画第一帧，所以改用原图直接显示，摇晃时整张以底边为轴歪
+ if(src0&&ddIsGif(src0)){
+  const im=document.createElement('img');im.className='dd-bl dd-gif';im.alt='';im.draggable=false;im.src=src0;
+  cv.replaceWith(im);ddCv={gif:im};return;
+ }
  const bw=ball.offsetWidth||56,bh=ball.offsetHeight||56,dpr=Math.min(2,window.devicePixelRatio||1);
  const padX=bw*.4,padT=bh*.4,padB=bh*.05;
  cv.width=Math.round((bw+padX*2)*dpr);cv.height=Math.round((bh+padT+padB)*dpr);
@@ -619,7 +636,9 @@ function ddSetupCanvas(ball){
  const im=new Image();im.onload=()=>{if(ddCv===st){st.img=im;ddDraw(0,0);}};im.src=ddIconSrc()||ddSvgSrc();
 }
 function ddDraw(r,s){
- const st=ddCv;if(!st||!st.img||!document.body.contains(st.cv))return;
+ const st=ddCv;
+ if(st&&st.gif){st.gif.style.transformOrigin='50% 100%';st.gif.style.transform=(r||s)?'skewX('+(-r).toFixed(2)+'deg) scale('+(1-s*.5).toFixed(3)+','+(1+s).toFixed(3)+')':'';return;}
+ if(!st||!st.img||!document.body.contains(st.cv))return;
  const {cv,bw,bh,dpr,padX,padT,img}=st,ctx=cv.getContext('2d');
  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,cv.width,cv.height);
  ctx.setTransform(dpr,0,0,dpr,padX*dpr,padT*dpr);
@@ -817,7 +836,7 @@ function ddMountSettings(){
    if(k.ballIcon==='custom:'+del.dataset.del){k.ballIcon=DD_BUILTIN_ICONS[0]||'default';k.ballIconPicked=true;}
    ddSave();paintIcons();ddRefreshBall();msg.textContent='已删除';return;
   }
-  const b=e.target.closest('.dd-icon-opt');if(!b)return;{const k=ddCfg();k.ballIcon=b.dataset.id;k.ballIconPicked=true;}ddSave();paintIcons();ddRefreshBall();};
+  const b=e.target.closest('.dd-icon-opt');if(!b)return;{const k=ddCfg();k.ballIcon=b.dataset.id;k.ballIconPicked=true;}ddSave();paintIcons();ddRefreshBall();msg.textContent='已选择这个图标（关掉窗口就能在悬浮球上看到）';};
  const file=box.querySelector('#dd-icon-file');
  box.querySelector('#dd-icon-upload').onclick=()=>file.click();
  file.onchange=async()=>{
@@ -845,7 +864,7 @@ function ddMountSettings(){
 // 用法：window.DuangDuang?.openImage('/backgrounds/xxx.png')，返回 Promise<boolean>（true=已打开）。
 // 同源路径、data:、blob:、http(s) 地址都可以；同源图片可以用局部 / 选区 / 摇晃的全部效果。
 window.DuangDuang={
- version:'0.4.0',
+ version:'0.5.0',
  ready:true,
  async openImage(src){
   try{
