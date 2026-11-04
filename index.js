@@ -608,7 +608,11 @@ function ddIconSrc(){const c=ddCfg();{const u=ddCustomUrl(c.ballIcon);if(u)retur
 // 悬浮球分上下两层：下半（固定线以下）原地不动，上半在固定线上摇摆 / 压扁拉长，所以摇晃时底边始终贴着原位
 function ddBallHtml(){
  const one=ddBallOneHtml(),fixed=Math.max(0,Math.min(70,Number(ddCfg().ballFixed)||0)),pin=100-fixed;
- return '<span class="dd-bl dd-bl-bot" style="clip-path:inset('+(pin-.3)+'% 0 0 0)">'+one+'</span><span class="dd-bl dd-bl-top" style="clip-path:inset(0 0 '+fixed+'% 0);transform-origin:50% '+pin+'%">'+one+'</span>';
+ const F=fixed>0?Math.min(14,pin/2):0,a=(pin-F).toFixed(1),b=pin.toFixed(1);
+ const mk=(g)=>'-webkit-mask-image:'+g+';mask-image:'+g+';';
+ const botM=fixed>0?mk('linear-gradient(to bottom,transparent '+a+'%,#000 '+b+'%)'):'visibility:hidden;';
+ const topM=fixed>0?mk('linear-gradient(to bottom,#000 '+a+'%,transparent '+b+'%)'):'';
+ return '<span class="dd-bl dd-bl-bot" style="'+botM+'">'+one+'</span><span class="dd-bl dd-bl-top" style="'+topM+'transform-origin:50% '+pin+'%">'+one+'</span>';
 }
 const ddDimCache={};
 function ddMeasure(src){
