@@ -4,11 +4,14 @@ import { extension_settings } from '/scripts/extensions.js';
 import { saveSettingsDebounced } from '/script.js';
 
 const EXT='duangduang';
-const defaults={ballOn:true,ballX:1,ballY:.62,ballShake:true,ballIcon:'default',ballIconPicked:false,ballFixed:26,ballCustom:'',ballSize:56,jellyOn:true,jellyScope:'local',jellyTap:false,jellyDrag:true,jellyShake:false,jellyStrength:'mid',jellyBrush:.075};
+const defaults={ballOn:true,ballX:1,ballY:.62,ballShake:true,ballIcon:'default',ballIconPicked:false,ballFixed:26,ballCustoms:[],ballSize:56,jellyOn:true,jellyScope:'local',jellyTap:false,jellyDrag:true,jellyShake:false,jellyStrength:'mid',jellyBrush:.075};
 function ddCfg(){
  if(!extension_settings[EXT])extension_settings[EXT]={};
  const c=extension_settings[EXT];
  for(const k of Object.keys(defaults))if(c[k]===undefined)c[k]=defaults[k];
+ // 旧版只存一张上传图 ballCustom，迁移成列表
+ if(c.ballCustom){if(!Array.isArray(c.ballCustoms))c.ballCustoms=[];if(!c.ballCustoms.length)c.ballCustoms.push({id:'u1',url:c.ballCustom});if(c.ballIcon==='custom')c.ballIcon='custom:'+c.ballCustoms[0].id;delete c.ballCustom;}
+ if(!Array.isArray(c.ballCustoms))c.ballCustoms=[];
  // 没手动挑过图标的人，自动换成内置的果冻图标
  if(c.ballIcon==='default'&&!c.ballIconPicked&&typeof DD_BUILTIN_ICONS!=='undefined'&&DD_BUILTIN_ICONS.includes('jelly.png'))c.ballIcon='jelly.png';
  return c;
@@ -590,13 +593,14 @@ const DD_BALL_SVG='<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 5c10
 // 内置悬浮球图标：把 png 放进 icons/ 文件夹，再把文件名加进这个列表就会出现在设置里
 const DD_BUILTIN_ICONS=['jelly.png'];
 function ddIconUrl(name){try{return new URL('./icons/'+name,import.meta.url).href;}catch{return 'icons/'+name;}}
+function ddCustomUrl(id){if(typeof id!=='string'||!id.startsWith('custom:'))return '';const it=ddCfg().ballCustoms.find(x=>'custom:'+x.id===id);return it?it.url:'';}
 function ddBallOneHtml(){
  const c=ddCfg();
- if(c.ballIcon==='custom'&&c.ballCustom)return '<img alt="" draggable="false" src="'+c.ballCustom+'">';
+ {const u=ddCustomUrl(c.ballIcon);if(u)return '<img alt="" draggable="false" src="'+u+'">';}
  if(DD_BUILTIN_ICONS.includes(c.ballIcon))return '<img alt="" draggable="false" src="'+ddIconUrl(c.ballIcon)+'">';
  return DD_BALL_SVG;
 }
-function ddIconSrc(){const c=ddCfg();if(c.ballIcon==='custom'&&c.ballCustom)return c.ballCustom;if(DD_BUILTIN_ICONS.includes(c.ballIcon))return ddIconUrl(c.ballIcon);return '';}
+function ddIconSrc(){const c=ddCfg();{const u=ddCustomUrl(c.ballIcon);if(u)return u;}if(DD_BUILTIN_ICONS.includes(c.ballIcon))return ddIconUrl(c.ballIcon);return '';}
 // 悬浮球分上下两层：下半（固定线以下）原地不动，上半在固定线上摇摆 / 压扁拉长，所以摇晃时底边始终贴着原位
 function ddBallHtml(){
  const one=ddBallOneHtml(),fixed=Math.max(0,Math.min(70,Number(ddCfg().ballFixed)||0)),pin=100-fixed;
@@ -730,16 +734,33 @@ function ddMountSettings(){
   const cur=ddCfg();
   const items=[{id:'default',html:DD_BALL_SVG,title:'默认'}];
   for(const n of DD_BUILTIN_ICONS)items.push({id:n,html:'<img alt="" draggable="false" src="'+ddIconUrl(n)+'">',title:n});
-  if(cur.ballCustom)items.push({id:'custom',html:'<img alt="" draggable="false" src="'+cur.ballCustom+'">',title:'我上传的'});
-  icons.innerHTML=items.map(it=>'<button type="button" class="dd-icon-opt'+(cur.ballIcon===it.id?' is-on':'')+'" data-id="'+it.id+'" title="'+it.title+'" aria-label="'+it.title+'">'+it.html+'</button>').join('');
+  for(const it of cur.ballCustoms)items.push({id:'custom:'+it.id,custom:it.id,html:'<img alt="" draggable="false" src="'+it.url+'">',title:'我上传的'});
+  icons.innerHTML=items.map(it=>{
+   const btn='<button type="button" class="dd-icon-opt'+(cur.ballIcon===it.id?' is-on':'')+'" data-id="'+it.id+'" title="'+it.title+'" aria-label="'+it.title+'">'+it.html+'</button>';
+   return it.custom?'<span class="dd-icon-wrap">'+btn+'<button type="button" class="dd-icon-del" data-del="'+it.custom+'" title="删除这张" aria-label="删除这张">×</button></span>':btn;
+  }).join('');
  };
  paintIcons();
- icons.onclick=e=>{const b=e.target.closest('.dd-icon-opt');if(!b)return;{const k=ddCfg();k.ballIcon=b.dataset.id;k.ballIconPicked=true;}ddSave();paintIcons();ddRefreshBall();};
+ icons.onclick=e=>{
+  const del=e.target.closest('.dd-icon-del');
+  if(del){
+   // 两次点击才删：第一次变红提示，第二次真的删掉
+   if(del.dataset.armed!=='1'){del.dataset.armed='1';del.classList.add('is-armed');del.textContent='删?';setTimeout(()=>{if(del.isConnected){del.dataset.armed='';del.classList.remove('is-armed');del.textContent='×';}},2600);return;}
+   const k=ddCfg();k.ballCustoms=k.ballCustoms.filter(x=>x.id!==del.dataset.del);
+   if(k.ballIcon==='custom:'+del.dataset.del){k.ballIcon=DD_BUILTIN_ICONS[0]||'default';k.ballIconPicked=true;}
+   ddSave();paintIcons();ddRefreshBall();msg.textContent='已删除';return;
+  }
+  const b=e.target.closest('.dd-icon-opt');if(!b)return;{const k=ddCfg();k.ballIcon=b.dataset.id;k.ballIconPicked=true;}ddSave();paintIcons();ddRefreshBall();};
  const file=box.querySelector('#dd-icon-file');
  box.querySelector('#dd-icon-upload').onclick=()=>file.click();
  file.onchange=async()=>{
   const f=file.files&&file.files[0];file.value='';if(!f)return;
-  try{const url=await ddReadIcon(f);const k=ddCfg();k.ballCustom=url;k.ballIcon='custom';k.ballIconPicked=true;ddSave();paintIcons();ddRefreshBall();msg.textContent='已换成你上传的图片';}
+  try{
+   const k=ddCfg();
+   if(k.ballCustoms.length>=8){msg.textContent='最多存 8 张，请先删掉不用的（图标右上角的 ×）';return;}
+   const url=await ddReadIcon(f);const id='u'+Date.now().toString(36);
+   k.ballCustoms.push({id,url});k.ballIcon='custom:'+id;k.ballIconPicked=true;ddSave();paintIcons();ddRefreshBall();msg.textContent='已换成你上传的图片';
+  }
   catch(err){msg.textContent='上传失败：'+((err&&err.message)||err);}
  };
  box.querySelector('#dd-icon-reset').onclick=()=>{const k=ddCfg();k.ballIcon='default';k.ballIconPicked=true;ddSave();paintIcons();ddRefreshBall();msg.textContent='';};
