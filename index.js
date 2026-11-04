@@ -732,8 +732,8 @@ function ddStartBallShake(){
   else{const g=e.accelerationIncludingGravity||{};const vx=g.x||0,vy=g.y||0;if(!primed){gx=vx;gy=vy;primed=true;}gx=gx*.9+vx*.1;gy=gy*.9+vy*.1;ax=vx-gx;ay=vy-gy;}
   if(Math.abs(ax)+Math.abs(ay)<1.2)return;
   const k=ddJellyCfg().amp/.5,cl=(v,m)=>Math.max(-m,Math.min(m,v));
-  st.vr+=cl(-ax*.45*k,5*k);st.vs+=cl(ay*.012*k,.05*k);
-  st.r=cl(st.r,20);st.s=cl(st.s,.25);
+  st.vr+=cl(-ax*.16*k,1.8*k);st.vs+=cl(ay*.005*k,.02*k);
+  st.r=cl(st.r,7);st.s=cl(st.s,.08);
   if(!raf)raf=requestAnimationFrame(tick);
  });
 }
