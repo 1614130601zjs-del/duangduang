@@ -8,8 +8,8 @@
 }
 
 /* 悬浮球 */
-.dd-ball{position:fixed;z-index:2147482000;width:46px;height:46px;padding:0;border:0;border-radius:50%;background:none;color:var(--dd-accent);cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent;filter:drop-shadow(0 3px 6px rgba(0,0,0,.35));transition:transform .18s cubic-bezier(.3,1.6,.5,1),left .25s ease;opacity:.92}
-.dd-ball svg{display:block;width:100%;height:100%;pointer-events:none}
+.dd-ball{position:fixed;z-index:2147482000;width:var(--dd-ball-size,46px);height:var(--dd-ball-size,46px);padding:0;border:0;border-radius:50%;background:none;color:var(--dd-accent);cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent;filter:drop-shadow(0 3px 6px rgba(0,0,0,.35));transition:transform .18s cubic-bezier(.3,1.6,.5,1),left .25s ease;opacity:.92}
+.dd-ball svg,.dd-ball img{display:block;width:100%;height:100%;pointer-events:none;object-fit:contain;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .dd-ball:active,.dd-ball.is-dragging{transform:scale(1.06,.95)}
 .dd-ball.is-dragging{transition:none}
 .dd-ball.is-active{animation:dd-bounce 1.6s ease-in-out infinite;opacity:1;filter:drop-shadow(0 0 8px var(--dd-accent))}
@@ -17,10 +17,10 @@
 
 /* 选图模式：盖住整个页面，拦截点击 */
 .dd-pick{position:fixed;inset:0;z-index:2147481000;background:rgba(0,0,0,.18);touch-action:none;cursor:crosshair;-webkit-user-select:none;user-select:none}
-.dd-pick-hint{position:absolute;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;max-width:calc(100vw - 24px);padding:6px 8px 6px 14px;border-radius:999px;background:var(--dd-bg);color:var(--dd-text);border:1px solid var(--dd-border);font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.3);pointer-events:none}
+.dd-pick-hint{position:absolute;width:max-content;white-space:nowrap;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;max-width:calc(100vw - 24px);padding:6px 8px 6px 14px;border-radius:999px;background:var(--dd-bg);color:var(--dd-text);border:1px solid var(--dd-border);font-size:13px;line-height:1.3;box-shadow:0 4px 14px rgba(0,0,0,.3);pointer-events:none}
 .dd-pick-exit{all:unset;pointer-events:auto;box-sizing:border-box;min-width:28px;height:28px;border-radius:50%;text-align:center;line-height:28px;cursor:pointer;background:var(--dd-accent);color:#fff;font-size:13px}
 .dd-hl{position:fixed;display:none;box-sizing:border-box;pointer-events:none;border:2px solid var(--dd-accent);border-radius:6px;background:color-mix(in srgb,var(--dd-accent) 18%,transparent);box-shadow:0 0 0 9999px rgba(0,0,0,.28)}
-.dd-toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 90px);transform:translateX(-50%) translateY(10px);z-index:2147483600;padding:8px 14px;border-radius:999px;background:var(--dd-bg);color:var(--dd-text);border:1px solid var(--dd-border);font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:calc(100vw - 32px);box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.dd-toast{position:fixed;width:max-content;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 90px);transform:translateX(-50%) translateY(10px);z-index:2147483600;padding:8px 14px;border-radius:999px;background:var(--dd-bg);color:var(--dd-text);border:1px solid var(--dd-border);font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:calc(100vw - 32px);box-shadow:0 4px 14px rgba(0,0,0,.3)}
 .dd-toast.is-on{opacity:1;transform:translateX(-50%)}
 
 /* 放大弹窗 */
@@ -58,3 +58,16 @@ dialog.dd-viewer .dd-jelly-bar .dd-jb-brush input{width:84px;accent-color:var(--
 /* 设置面板里的小排版 */
 #dd-settings .dd-set-row{display:flex;align-items:center;gap:8px;margin:6px 0}
 #dd-settings small{display:block;opacity:.7;margin-top:6px}
+
+#dd-settings .dd-icons{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}
+#dd-settings .dd-icon-opt{all:unset;box-sizing:border-box;width:44px;height:44px;padding:4px;border-radius:10px;border:2px solid transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;background:rgba(127,127,127,.15);color:var(--dd-accent)}
+#dd-settings .dd-icon-opt.is-on{border-color:var(--dd-accent)}
+#dd-settings .dd-icon-opt svg,#dd-settings .dd-icon-opt img{width:100%;height:100%;object-fit:contain;pointer-events:none}
+
+/* 果冻面板：弹性下拉（向下展开） */
+dialog.dd-viewer .dd-jelly-bar .dd-jb-dd{position:relative;display:inline-block}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-dd-list{position:absolute;top:calc(100% + 4px);left:0;z-index:8;display:flex;flex-direction:column;gap:3px;padding:4px;min-width:100%;box-sizing:border-box;border-radius:12px;background:var(--dd-bg);border:1px solid var(--dd-border);box-shadow:0 4px 14px rgba(0,0,0,.35)}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-dd-list[hidden]{display:none}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-dd-list button{text-align:left;display:block;border-radius:8px}
+dialog.dd-viewer .dd-jelly-bar .dd-jb-panel.is-dd-open{padding-bottom:118px}
+#dd-settings .dd-note{display:block;opacity:.75;margin:2px 0 6px}
