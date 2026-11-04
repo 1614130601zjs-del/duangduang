@@ -626,12 +626,17 @@ function ddPlaceBall(ball){
 let ddBallMotion=false;
 function ddStartBallShake(){
  if(ddBallMotion)return;ddBallMotion=true;
- const st={x:0,y:0,r:0,vx:0,vy:0,vr:0};let raf=0,gx=0,gy=0,primed=false;
+ // 底部固定在原位：只以图标底边中点为轴左右摇摆、上下压扁拉长，像不倒翁 / 果冻
+ const st={r:0,vr:0,s:0,vs:0};let raf=0,gx=0,gy=0,primed=false;
  const tick=()=>{
-  for(const [p,v] of [['x','vx'],['y','vy'],['r','vr']]){st[v]+=-st[p]*.12;st[v]*=.88;st[p]+=st[v];}
-  const live=Math.abs(st.x)+Math.abs(st.y)+Math.abs(st.r)+Math.abs(st.vx)+Math.abs(st.vy)+Math.abs(st.vr)>.08;
+  st.vr+=-st.r*.1;st.vr*=.9;st.r+=st.vr;
+  st.vs+=-st.s*.14;st.vs*=.86;st.s+=st.vs;
+  const live=Math.abs(st.r)+Math.abs(st.vr)+Math.abs(st.s*30)+Math.abs(st.vs*30)>.08;
   const el=document.querySelector('.dd-ball>svg,.dd-ball>img');
-  if(el)el.style.transform=live?'translate('+st.x.toFixed(2)+'px,'+st.y.toFixed(2)+'px) rotate('+st.r.toFixed(2)+'deg) scale('+(1+Math.min(.14,Math.abs(st.vx)*.02)).toFixed(3)+','+(1-Math.min(.12,Math.abs(st.vy)*.02)).toFixed(3)+')':'';
+  if(el){
+   el.style.transformOrigin='50% 100%';
+   el.style.transform=live?'rotate('+st.r.toFixed(2)+'deg) scale('+(1-st.s*.5).toFixed(3)+','+(1+st.s).toFixed(3)+')':'';
+  }
   raf=live?requestAnimationFrame(tick):0;
  };
  window.addEventListener('devicemotion',e=>{
@@ -641,7 +646,8 @@ function ddStartBallShake(){
   else{const g=e.accelerationIncludingGravity||{};const vx=g.x||0,vy=g.y||0;if(!primed){gx=vx;gy=vy;primed=true;}gx=gx*.9+vx*.1;gy=gy*.9+vy*.1;ax=vx-gx;ay=vy-gy;}
   if(Math.abs(ax)+Math.abs(ay)<1.2)return;
   const k=ddJellyCfg().amp/.5,cl=(v,m)=>Math.max(-m,Math.min(m,v));
-  st.vx+=cl(-ax*.5*k,7*k);st.vy+=cl(ay*.5*k,7*k);st.vr+=cl(-ax*.35*k,6*k);
+  st.vr+=cl(-ax*.45*k,5*k);st.vs+=cl(ay*.012*k,.05*k);
+  st.r=cl(st.r,28);st.s=cl(st.s,.25);
   if(!raf)raf=requestAnimationFrame(tick);
  });
 }
