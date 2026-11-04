@@ -440,7 +440,7 @@ function ddOpenViewer(url){
    // 手指抬起后系统会补发一个 click，落在刚打开的弹窗上，会被当成点了背景而立刻关掉；打开后短时间内忽略点背景。
    if(e.target===dlg&&Date.now()-(dlg._ddOpenedAt||0)<600)return;
    if(e.target===dlg||e.target.closest('.dd-close')){if(dlg.open)dlg.close();else dlg.removeAttribute('open');}});
-  dlg.addEventListener('close',()=>{dlg.querySelector('img')?.removeAttribute('src');dlg.querySelector('img')?._ddJellyAbort?.abort();ddOnViewerClosed();});
+  dlg.addEventListener('close',()=>{ddBallBack();dlg.querySelector('img')?.removeAttribute('src');dlg.querySelector('img')?._ddJellyAbort?.abort();ddOnViewerClosed();});
   document.body.append(dlg);
  }
  const img=dlg.querySelector('img');
@@ -448,8 +448,12 @@ function ddOpenViewer(url){
  ddJellyClearSelection(img);{const p=dlg.querySelector('.dd-jb-panel');if(p)p.hidden=true;}dlg._ddMsg?.('');
  ddAttachJelly(img);dlg._ddPaintBar?.();
  dlg._ddOpenedAt=Date.now();
+ ddBallInto(dlg);
  if(!dlg.open){if(typeof dlg.showModal==='function')dlg.showModal();else{dlg.setAttribute('open','');dlg.style.position='fixed';}}
 }
+// 模态弹窗会把页面其他内容压在下面，悬浮球就看不见了；弹窗打开期间把球临时搬进弹窗里，关闭后搬回 body。
+function ddBallInto(dlg){const b=document.querySelector('.dd-ball');if(b&&b.parentElement!==dlg)dlg.append(b);}
+function ddBallBack(){const b=document.querySelector('.dd-ball');if(b&&b.parentElement!==document.body)document.body.append(b);}
 function ddOnViewerClosed(){if(ddPicking)ddShowPickUi(true);}
 
 // ===== 取图：从页面上点中的元素里拿到可以显示的地址 =====
@@ -701,7 +705,11 @@ function ddMountBall(){
    const w=ball.offsetWidth,h=ball.offsetHeight,r=ball.getBoundingClientRect();
    const toRight=r.left+w/2>window.innerWidth/2;
    const c=ddCfg();c.ballX=toRight?1:0;c.ballY=Math.max(0,Math.min(1,r.top/Math.max(1,window.innerHeight-h)));ddSave();ddPlaceBall(ball);
-  }else{ddPicking?ddExitPick():ddEnterPick();}
+  }else{
+   const dlg=document.querySelector('dialog.dd-viewer[open]');
+   if(dlg){dlg.close();return;}   // 弹窗开着时点悬浮球：关掉弹窗，回到选图
+   ddPicking?ddExitPick():ddEnterPick();
+  }
  };
  ball.addEventListener('pointerup',end);ball.addEventListener('pointercancel',end);
  window.addEventListener('resize',()=>ddPlaceBall(ball));
