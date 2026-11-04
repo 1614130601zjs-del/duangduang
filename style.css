@@ -78,3 +78,4 @@ dialog.dd-viewer .dd-jelly-bar .dd-jb-panel.is-dd-open{padding-bottom:118px}
 #dd-settings .dd-icon-wrap{position:relative;display:inline-block}
 #dd-settings .dd-icon-del{all:unset;position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:rgba(0,0,0,.65);color:#fff;font-size:12px;line-height:18px;text-align:center;cursor:pointer}
 #dd-settings .dd-icon-del.is-armed{background:#e0446a;font-size:11px}
+.dd-ball .dd-cv{position:absolute;display:block;pointer-events:none;width:auto;height:auto}
