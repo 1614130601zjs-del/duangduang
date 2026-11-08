@@ -42,7 +42,7 @@ function ddBurst(img,pt){
   if(!img.isConnected)return;
   const fac=b.decay?(b.n>1?1-i/b.n*.82:1):1,k=b.power*fac;
   if(b.mode==='press')img._ddPress?.(k,pt);else img._ddKick?.(k*.55);
-  if(++i<b.n)setTimeout(go,b.mode==='press'?300:230);
+  if(++i<b.n)setTimeout(go,b.mode==='press'?420:230);
  };
  go();
 }
@@ -282,7 +282,6 @@ function ddAttachJelly(img){
   if(!press||(e&&e.pointerId!==press.id))return;
   const p=press;press=null;p.smudging=false;try{img.releasePointerCapture(p.id);}catch{}
   if(p.paint){return;}
-  if(conf.burst&&!S.selecting&&!p.moved&&Date.now()-p.t<450){ddBurst(img,[cx,cy]);}
   Object.assign(dep,{k:.15,d:.78});Object.assign(ox,{k:.13,d:.8});Object.assign(oy,{k:.13,d:.8});
   dep.t=0;ox.t=0;oy.t=0;
   if(scope==='whole'){
@@ -292,6 +291,7 @@ function ddAttachJelly(img){
    aff.t=[0,0,1,1,0];
   }
   kick();
+  if(conf.burst&&!S.selecting&&!p.moved&&Date.now()-p.t<450)ddBurst(img,[cx,cy]);
  };
  img.addEventListener('pointerup',end,sig);img.addEventListener('pointercancel',end,sig);
  img.addEventListener('contextmenu',e=>{if(press)e.preventDefault();},sig);
@@ -301,8 +301,8 @@ function ddAttachJelly(img){
   if(scope==='whole'){aff.x[2]=1+.11*amp*k;aff.x[3]=1-.14*amp*k;aff.v[2]=0;aff.v[3]=0;aff.t=[0,0,1,1,0];kick();return;}
   if(pt){cx=pt[0];cy=pt[1];}else if(!cx&&!cy){cx=boxW/2;cy=boxH/2;}
   Object.assign(dep,{k:.3,d:.6});Object.assign(ox,{k:.3,d:.7});Object.assign(oy,{k:.3,d:.7});ox.t=ox.x=0;oy.t=oy.x=0;ox.v=oy.v=0;
-  dep.t=Math.min(.5,.3*amp*k);kick();
-  setTimeout(()=>{Object.assign(dep,{k:.15,d:.78});dep.t=0;kick();},110);};
+  dep.t=Math.min(.6,.7*amp*k);kick();
+  setTimeout(()=>{Object.assign(dep,{k:.15,d:.78});dep.t=0;kick();},200);};
  // 自动 duang：由定时器调用，随机方向推一下，弹簧自己回来。
  img._ddKick=(k)=>{if(S.selecting||press)return;if(!ensure())return;show();const s=Math.max(.15,Number(k)||1)*(amp/.5),r=()=>(Math.random()<.5?-1:1)*(.55+Math.random()*.45);shk.vx+=Math.max(-1.2,Math.min(1.2,r()*.5*s));shk.vy+=Math.max(-1.2,Math.min(1.2,r()*.5*s));shk.x=Math.max(-1.6,Math.min(1.6,shk.x));shk.y=Math.max(-1.6,Math.min(1.6,shk.y));kick();};
  // 摇晃手机：加速度推着选区（没选区时是整张图、边缘不动）晃，停了弹簧自己回来。
