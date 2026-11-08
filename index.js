@@ -4,7 +4,7 @@ import { extension_settings } from '/scripts/extensions.js';
 import { saveSettingsDebounced, getRequestHeaders } from '/script.js';
 
 const EXT='duangduang';
-const defaults={ballOn:true,ballX:1,ballY:.62,ballShake:true,ballIcon:'default',ballIconPicked:false,ballFixed:26,ballCustoms:[],ballSize:56,jellyOn:true,jellyScope:'local',jellyTap:false,jellyDrag:true,jellyShake:false,jellyStrength:'mid',jellyBrush:.075,jellyBurst:false,jellyBurstN:4,autoOn:false,autoMode:'interval',autoSec:8,autoPower:1,autoBall:true,autoViewer:true};
+const defaults={ballOn:true,ballX:1,ballY:.62,ballShake:true,ballIcon:'default',ballIconPicked:false,ballFixed:26,ballCustoms:[],ballSize:56,jellyOn:true,jellyScope:'local',jellyTap:false,jellyDrag:true,jellyShake:false,jellyStrength:'mid',jellyBrush:.075,jellyBurst:false,jellyBurstN:3,jellyBurstMode:'wobble',jellyBurstDecay:true,jellyBurstPower:1,autoOn:false,autoMode:'interval',autoSec:8,autoPower:1,autoBall:true,autoViewer:true};
 function ddCfg(){
  if(!extension_settings[EXT])extension_settings[EXT]={};
  const c=extension_settings[EXT];
@@ -34,8 +34,18 @@ function ddJellyCfg(){
  if(typeof c.jellyShake!=='boolean')c.jellyShake=false;
  return {burst:c.jellyBurst===true,on:c.jellyOn,scope:['smudge','whole'].includes(c.jellyScope)?c.jellyScope:'local',tap:false,drag:c.jellyDrag,shake:c.jellyShake,amp:{soft:.35,mid:.5,bouncy:.65}[c.jellyStrength]||.5,reach:ddJellyReach()};
 }
-// 点一下连晃几下：每隔 ~0.23 秒随机推一次，共 n 次（默认 4）。
-function ddBurst(img,n){const total=Math.max(2,Math.min(12,Number(n)||Number(ddCfg().jellyBurstN)||4));let i=0;const go=()=>{if(!img.isConnected||!img._ddKick)return;img._ddKick(1.1);if(++i<total)setTimeout(go,230);};go();}
+// 点一下连晃：两种模式——“摇晃”（随机方向推几下）/“按压反馈”（和最早的点击反馈一样，重复几次）。可设次数、是否越晃越弱、幅度。
+function ddBurstCfg(){const c=ddCfg();return{mode:c.jellyBurstMode==='press'?'press':'wobble',n:Math.max(1,Math.min(10,Math.round(Number(c.jellyBurstN)||3))),decay:c.jellyBurstDecay!==false,power:Math.max(.2,Math.min(2,Number(c.jellyBurstPower)||1))};}
+function ddBurst(img,pt){
+ const b=ddBurstCfg();let i=0;
+ const go=()=>{
+  if(!img.isConnected)return;
+  const fac=b.decay?(b.n>1?1-i/b.n*.82:1):1,k=b.power*fac;
+  if(b.mode==='press')img._ddPress?.(k,pt);else img._ddKick?.(k*.55);
+  if(++i<b.n)setTimeout(go,b.mode==='press'?300:230);
+ };
+ go();
+}
 function ddJellyBrush(){const b=Number(ddCfg().jellyBrush);return Number.isFinite(b)&&b>0?Math.max(.02,Math.min(.2,b)):.075;}
 function ddJellyState(img){
  if(!img._ddJ)img._ddJ={mask:new Float32Array(DD_JELLY_MW*DD_JELLY_MH),has:false,selecting:false};
@@ -272,7 +282,7 @@ function ddAttachJelly(img){
   if(!press||(e&&e.pointerId!==press.id))return;
   const p=press;press=null;p.smudging=false;try{img.releasePointerCapture(p.id);}catch{}
   if(p.paint){return;}
-  if(conf.burst&&!S.selecting&&!p.moved&&Date.now()-p.t<450){ddBurst(img);}
+  if(conf.burst&&!S.selecting&&!p.moved&&Date.now()-p.t<450){ddBurst(img,[cx,cy]);}
   Object.assign(dep,{k:.15,d:.78});Object.assign(ox,{k:.13,d:.8});Object.assign(oy,{k:.13,d:.8});
   dep.t=0;ox.t=0;oy.t=0;
   if(scope==='whole'){
@@ -286,6 +296,13 @@ function ddAttachJelly(img){
  img.addEventListener('pointerup',end,sig);img.addEventListener('pointercancel',end,sig);
  img.addEventListener('contextmenu',e=>{if(press)e.preventDefault();},sig);
  if(S.selecting&&ensure()){selCv.style.display='block';paintSel();}
+ // 点击反馈（按压）：和最早的点击一样——在点按处压下去，松开回弹；全屏范围则是整张压扁一下。
+ img._ddPress=(k,pt)=>{if(S.selecting||press)return;if(!ensure())return;show();k=Math.max(.15,Number(k)||1);
+  if(scope==='whole'){aff.x[2]=1+.11*amp*k;aff.x[3]=1-.14*amp*k;aff.v[2]=0;aff.v[3]=0;aff.t=[0,0,1,1,0];kick();return;}
+  if(pt){cx=pt[0];cy=pt[1];}else if(!cx&&!cy){cx=boxW/2;cy=boxH/2;}
+  Object.assign(dep,{k:.3,d:.6});Object.assign(ox,{k:.3,d:.7});Object.assign(oy,{k:.3,d:.7});ox.t=ox.x=0;oy.t=oy.x=0;ox.v=oy.v=0;
+  dep.t=Math.min(.5,.3*amp*k);kick();
+  setTimeout(()=>{Object.assign(dep,{k:.15,d:.78});dep.t=0;kick();},110);};
  // 自动 duang：由定时器调用，随机方向推一下，弹簧自己回来。
  img._ddKick=(k)=>{if(S.selecting||press)return;if(!ensure())return;show();const s=Math.max(.15,Number(k)||1)*(amp/.5),r=()=>(Math.random()<.5?-1:1)*(.55+Math.random()*.45);shk.vx+=Math.max(-1.2,Math.min(1.2,r()*.5*s));shk.vy+=Math.max(-1.2,Math.min(1.2,r()*.5*s));shk.x=Math.max(-1.6,Math.min(1.6,shk.x));shk.y=Math.max(-1.6,Math.min(1.6,shk.y));kick();};
  // 摇晃手机：加速度推着选区（没选区时是整张图、边缘不动）晃，停了弹簧自己回来。
@@ -332,6 +349,7 @@ function ddAttachJellyWhole(img,conf){
  };
  const kick=()=>{if(!raf)raf=requestAnimationFrame(tick);};
  const rest=()=>{st.t=[0,0,1,1,0];};
+ img._ddPress=(k)=>{if(drag)return;k=Math.max(.15,Number(k)||1);st.x[2]=1+.11*amp*k;st.x[3]=1-.14*amp*k;st.v[2]=0;st.v[3]=0;rest();kick();};
  img._ddKick=(k)=>{if(drag)return;const s=Math.max(.15,Number(k)||1)*(amp/.5),sg=Math.random()<.5?-1:1;st.v[4]+=sg*2.4*s;st.v[2]+=sg*.03*s;st.v[3]-=sg*.04*s;st.v[0]+=-sg*1.6*s;rest();kick();};
  const squish=()=>{st.x[2]=1+.11*amp;st.x[3]=1-.14*amp;st.v[2]=0;st.v[3]=0;rest();kick();};
  img.addEventListener('pointerdown',e=>{
@@ -842,9 +860,18 @@ function ddMountSettings(){
   +'<div class="dd-set-row" id="dd-auto-sec-row"><label for="dd-auto-sec">间隔</label><input id="dd-auto-sec" type="range" min="2" max="60" step="1"><span id="dd-auto-sec-v"></span></div>'
   +'<div class="dd-set-row"><label for="dd-auto-power">力度</label><input id="dd-auto-power" type="range" min="30" max="200" step="5"><span id="dd-auto-power-v"></span></div>'
   +'<div class="dd-set-row"><label class="checkbox_label"><input id="dd-auto-ball" type="checkbox"><span>悬浮球</span></label><label class="checkbox_label"><input id="dd-auto-viewer" type="checkbox"><span>放大后的图</span></label></div></div>'
+  +'<div class="dd-set-row"><b>点一下连晃</b><small>（在放大图下方的“交互”里打开“点一下连晃”）</small></div>'
+  +'<div class="dd-set-row"><label for="dd-burst-mode">模式</label><select id="dd-burst-mode" class="text_pole"><option value="wobble">摇晃（随机方向晃几下）</option><option value="press">点击反馈（按压回弹，重复几次）</option></select></div>'
+  +'<div class="dd-set-row"><label for="dd-burst-n">次数</label><input id="dd-burst-n" type="range" min="1" max="10" step="1"><span id="dd-burst-n-v"></span></div>'
+  +'<div class="dd-set-row"><label for="dd-burst-power">幅度</label><input id="dd-burst-power" type="range" min="20" max="200" step="5"><span id="dd-burst-power-v"></span></div>'
+  +'<div class="dd-set-row"><label class="checkbox_label"><input id="dd-burst-decay" type="checkbox"><span>越晃越弱</span></label></div>'
   +'<div class="dd-set-row"><input id="dd-ball-reset" type="button" class="menu_button" value="重置悬浮球位置"></div>'
   +'<small>点悬浮球进入选图模式，再点任意一张图，就会放大到弹窗里玩果冻。范围、选区、交互（点击 / 拖动 / 摇晃）都在弹窗下方的小面板里。</small></div></div>';
  host.append(box);
+ {const q=id=>box.querySelector(id),mode=q('#dd-burst-mode'),n=q('#dd-burst-n'),pw=q('#dd-burst-power'),dc=q('#dd-burst-decay');
+  const paint=()=>{const b=ddBurstCfg();mode.value=b.mode;n.value=b.n;pw.value=Math.round(b.power*100);dc.checked=b.decay;q('#dd-burst-n-v').textContent=b.n+' 次';q('#dd-burst-power-v').textContent=Math.round(b.power*100)+'%';};
+  const set=()=>{const c=ddCfg();c.jellyBurstMode=mode.value;c.jellyBurstN=Number(n.value);c.jellyBurstPower=Number(pw.value)/100;c.jellyBurstDecay=dc.checked;ddSave();paint();};
+  [mode,n,pw,dc].forEach(el=>el.addEventListener('input',set));paint();}
  {const q=id=>box.querySelector(id),on=q('#dd-auto-on'),mode=q('#dd-auto-mode'),sec=q('#dd-auto-sec'),pw=q('#dd-auto-power'),ab=q('#dd-auto-ball'),av=q('#dd-auto-viewer'),b=q('#dd-auto-box'),row=q('#dd-auto-sec-row');
   const paint=()=>{const c=ddCfg();on.checked=!!c.autoOn;mode.value=['interval','random','always'].includes(c.autoMode)?c.autoMode:'interval';sec.value=c.autoSec;pw.value=Math.round(c.autoPower*100);ab.checked=c.autoBall!==false;av.checked=c.autoViewer!==false;q('#dd-auto-sec-v').textContent=c.autoSec+' 秒'+(c.autoMode==='random'?'起（随机到 2 倍）':'');q('#dd-auto-power-v').textContent=Math.round(c.autoPower*100)+'%';b.style.display=c.autoOn?'':'none';row.style.display=c.autoMode==='always'?'none':'';};
   const set=()=>{const c=ddCfg();c.autoOn=on.checked;c.autoMode=mode.value;c.autoSec=Number(sec.value);c.autoPower=Number(pw.value)/100;c.autoBall=ab.checked;c.autoViewer=av.checked;ddSave();paint();ddAutoStart();};
