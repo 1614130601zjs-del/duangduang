@@ -4,7 +4,7 @@ import { extension_settings } from '/scripts/extensions.js';
 import { saveSettingsDebounced, getRequestHeaders } from '/script.js';
 
 const EXT='duangduang';
-const defaults={ballOn:true,ballX:1,ballY:.62,ballShake:true,ballIcon:'default',ballIconPicked:false,ballFixed:26,ballCustoms:[],ballSize:56,jellyOn:true,jellyScope:'local',jellyTap:false,jellyDrag:true,jellyShake:false,jellyStrength:'mid',jellyBrush:.075};
+const defaults={ballOn:true,ballX:1,ballY:.62,ballShake:true,ballIcon:'default',ballIconPicked:false,ballFixed:26,ballCustoms:[],ballSize:56,jellyOn:true,jellyScope:'local',jellyTap:false,jellyDrag:true,jellyShake:false,jellyStrength:'mid',jellyBrush:.075,autoOn:false,autoMode:'interval',autoSec:8,autoPower:1,autoBall:true,autoViewer:true};
 function ddCfg(){
  if(!extension_settings[EXT])extension_settings[EXT]={};
  const c=extension_settings[EXT];
@@ -283,6 +283,8 @@ function ddAttachJelly(img){
  img.addEventListener('pointerup',end,sig);img.addEventListener('pointercancel',end,sig);
  img.addEventListener('contextmenu',e=>{if(press)e.preventDefault();},sig);
  if(S.selecting&&ensure()){selCv.style.display='block';paintSel();}
+ // 自动 duang：由定时器调用，随机方向推一下，弹簧自己回来。
+ img._ddKick=(k)=>{if(S.selecting||press)return;if(!ensure())return;show();const s=Math.max(.15,Number(k)||1)*(amp/.5),r=()=>(Math.random()<.5?-1:1)*(.55+Math.random()*.45);shk.vx+=Math.max(-1.2,Math.min(1.2,r()*.5*s));shk.vy+=Math.max(-1.2,Math.min(1.2,r()*.5*s));shk.x=Math.max(-1.6,Math.min(1.6,shk.x));shk.y=Math.max(-1.6,Math.min(1.6,shk.y));kick();};
  // 摇晃手机：加速度推着选区（没选区时是整张图、边缘不动）晃，停了弹簧自己回来。
  if(conf.shake&&!S.selecting){
   let gx=0,gy=0,primed=false;
@@ -327,6 +329,7 @@ function ddAttachJellyWhole(img,conf){
  };
  const kick=()=>{if(!raf)raf=requestAnimationFrame(tick);};
  const rest=()=>{st.t=[0,0,1,1,0];};
+ img._ddKick=(k)=>{if(drag)return;const s=Math.max(.15,Number(k)||1)*(amp/.5),sg=Math.random()<.5?-1:1;st.v[4]+=sg*2.4*s;st.v[2]+=sg*.03*s;st.v[3]-=sg*.04*s;st.v[0]+=-sg*1.6*s;rest();kick();};
  const squish=()=>{st.x[2]=1+.11*amp;st.x[3]=1-.14*amp;st.v[2]=0;st.v[3]=0;rest();kick();};
  img.addEventListener('pointerdown',e=>{
   if(e.pointerType==='mouse'&&e.button!==0)return;
@@ -732,11 +735,12 @@ function ddPlaceBall(ball){
  ball.style.left=x+'px';ball.style.top=y+'px';
 }
 // ===== 手机摇晃时，悬浮球（不管用哪张图标）也整体 duang 地晃一晃 =====
-let ddBallMotion=false;
+let ddBallMotion=false,ddBallKick=null;
 function ddStartBallShake(){
  if(ddBallMotion)return;ddBallMotion=true;
  // 底部固定在原位：只以图标底边中点为轴左右摇摆、上下压扁拉长，像不倒翁 / 果冻
  const st={r:0,vr:0,s:0,vs:0};let raf=0,gx=0,gy=0,primed=false;
+ ddBallKick=(p)=>{const k=ddJellyCfg().amp/.5*Math.max(.15,Number(p)||1),sg=Math.random()<.5?-1:1;st.vr+=sg*1.5*k;st.vs+=(Math.random()<.5?-1:1)*.008*k;st.r=Math.max(-7,Math.min(7,st.r));if(!raf)raf=requestAnimationFrame(tick);};
  const tick=()=>{
   st.vr+=-st.r*.1;st.vr*=.9;st.r+=st.vr;
   st.vs+=-st.s*.14;st.vs*=.86;st.s+=st.vs;
@@ -755,6 +759,28 @@ function ddStartBallShake(){
   st.r=cl(st.r,7);st.s=cl(st.s,.08);
   if(!raf)raf=requestAnimationFrame(tick);
  });
+}
+// ===== 自动 duang：定时（固定间隔 / 随机间隔）或一直晃，作用在悬浮球和放大图上 =====
+let ddAutoTimer=0;
+function ddAutoFire(power){
+ if(document.hidden)return;
+ const c=ddCfg();
+ if(c.autoBall&&document.querySelector('.dd-ball'))try{ddBallKick?.(power);}catch{}
+ if(c.autoViewer){const img=document.querySelector('dialog.dd-viewer[open] img');try{img?._ddKick?.(power);}catch{}}
+}
+function ddAutoStart(){
+ clearTimeout(ddAutoTimer);ddAutoTimer=0;
+ const c=ddCfg();if(!c.autoOn)return;
+ const sec=Math.max(2,Math.min(120,Number(c.autoSec)||8)),power=Math.max(.3,Math.min(2,Number(c.autoPower)||1));
+ const step=()=>{
+  const cc=ddCfg();if(!cc.autoOn)return;
+  let wait;
+  if(cc.autoMode==='always'){ddAutoFire(power*.55);wait=650;}
+  else if(cc.autoMode==='random'){ddAutoFire(power);wait=(sec+Math.random()*sec)*1000;}
+  else{ddAutoFire(power);wait=sec*1000;}
+  ddAutoTimer=setTimeout(step,wait);
+ };
+ ddAutoTimer=setTimeout(step,1200);
 }
 function ddMountBall(){
  let ball=document.querySelector('.dd-ball');
@@ -807,9 +833,18 @@ function ddMountSettings(){
   +'<small class="dd-note">换图标建议用<b>透明底的 PNG</b>，不然悬浮球会带着一块底色。上传的是<b>原图，不压缩</b>（保存在酒馆的用户文件里），GIF / 动图 WebP 也能动。</small>'
   +'<div class="dd-set-row"><input id="dd-icon-upload" type="button" class="menu_button" value="上传图片"><input id="dd-icon-reset" type="button" class="menu_button" value="恢复默认图标"><input id="dd-icon-file" type="file" accept="image/*" hidden></div>'
   +'<div class="dd-set-row"><label for="dd-size">大小</label><input id="dd-size" type="range" min="28" max="200" step="2"><span id="dd-size-v"></span></div><div class="dd-set-row"><label for="dd-fixed">底部固定</label><input id="dd-fixed" type="range" min="0" max="70" step="2"><span id="dd-fixed-v"></span></div><small class="dd-note">摇晃手机时，图标下面这一段不动，只有上面摇，更像果冻。0 = 只固定最底边。</small><small id="dd-icon-msg"></small>'
+  +'<div class="dd-set-row"><label class="checkbox_label"><input id="dd-auto-on" type="checkbox"><span>自动 duang（不用手摇，自己晃）</span></label></div>'
+  +'<div id="dd-auto-box"><div class="dd-set-row"><label for="dd-auto-mode">方式</label><select id="dd-auto-mode" class="text_pole"><option value="interval">每隔一段时间晃一下</option><option value="random">随机间隔晃一下</option><option value="always">一直轻轻晃</option></select></div>'
+  +'<div class="dd-set-row" id="dd-auto-sec-row"><label for="dd-auto-sec">间隔</label><input id="dd-auto-sec" type="range" min="2" max="60" step="1"><span id="dd-auto-sec-v"></span></div>'
+  +'<div class="dd-set-row"><label for="dd-auto-power">力度</label><input id="dd-auto-power" type="range" min="30" max="200" step="5"><span id="dd-auto-power-v"></span></div>'
+  +'<div class="dd-set-row"><label class="checkbox_label"><input id="dd-auto-ball" type="checkbox"><span>悬浮球</span></label><label class="checkbox_label"><input id="dd-auto-viewer" type="checkbox"><span>放大后的图</span></label></div></div>'
   +'<div class="dd-set-row"><input id="dd-ball-reset" type="button" class="menu_button" value="重置悬浮球位置"></div>'
   +'<small>点悬浮球进入选图模式，再点任意一张图，就会放大到弹窗里玩果冻。范围、选区、交互（点击 / 拖动 / 摇晃）都在弹窗下方的小面板里。</small></div></div>';
  host.append(box);
+ {const q=id=>box.querySelector(id),on=q('#dd-auto-on'),mode=q('#dd-auto-mode'),sec=q('#dd-auto-sec'),pw=q('#dd-auto-power'),ab=q('#dd-auto-ball'),av=q('#dd-auto-viewer'),b=q('#dd-auto-box'),row=q('#dd-auto-sec-row');
+  const paint=()=>{const c=ddCfg();on.checked=!!c.autoOn;mode.value=['interval','random','always'].includes(c.autoMode)?c.autoMode:'interval';sec.value=c.autoSec;pw.value=Math.round(c.autoPower*100);ab.checked=c.autoBall!==false;av.checked=c.autoViewer!==false;q('#dd-auto-sec-v').textContent=c.autoSec+' 秒'+(c.autoMode==='random'?'起（随机到 2 倍）':'');q('#dd-auto-power-v').textContent=Math.round(c.autoPower*100)+'%';b.style.display=c.autoOn?'':'none';row.style.display=c.autoMode==='always'?'none':'';};
+  const set=()=>{const c=ddCfg();c.autoOn=on.checked;c.autoMode=mode.value;c.autoSec=Number(sec.value);c.autoPower=Number(pw.value)/100;c.autoBall=ab.checked;c.autoViewer=av.checked;ddSave();paint();ddAutoStart();};
+  [on,mode,sec,pw,ab,av].forEach(el=>el.addEventListener('input',set));paint();}
  const on=box.querySelector('#dd-ball-on'),st=box.querySelector('#dd-strength');
  on.checked=!!c.ballOn;on.onchange=()=>{ddCfg().ballOn=on.checked;ddSave();ddMountBall();};
  st.value=['soft','bouncy'].includes(c.jellyStrength)?c.jellyStrength:'mid';st.onchange=()=>{ddCfg().jellyStrength=st.value;ddSave();};
@@ -880,7 +915,7 @@ try{document.dispatchEvent(new CustomEvent('duangduang:ready',{detail:{version:w
 
 function ddInit(){
  if(window.__duangduangReady)return;window.__duangduangReady=true;
- ddMountBall();
+ ddMountBall();ddAutoStart();
  let tries=0;const t=setInterval(()=>{if(ddMountSettings()||++tries>40)clearInterval(t);},500);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ddInit);else ddInit();
