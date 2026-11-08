@@ -4,7 +4,7 @@ import { extension_settings } from '/scripts/extensions.js';
 import { saveSettingsDebounced, getRequestHeaders } from '/script.js';
 
 const EXT='duangduang';
-const defaults={ballOn:true,ballX:1,ballY:.62,ballShake:true,ballIcon:'default',ballIconPicked:false,ballFixed:26,ballCustoms:[],ballSize:56,jellyOn:true,jellyScope:'local',jellyTap:false,jellyDrag:true,jellyShake:false,jellyStrength:'mid',jellyBrush:.075,autoOn:false,autoMode:'interval',autoSec:8,autoPower:1,autoBall:true,autoViewer:true};
+const defaults={ballOn:true,ballX:1,ballY:.62,ballShake:true,ballIcon:'default',ballIconPicked:false,ballFixed:26,ballCustoms:[],ballSize:56,jellyOn:true,jellyScope:'local',jellyTap:false,jellyDrag:true,jellyShake:false,jellyStrength:'mid',jellyBrush:.075,jellyBurst:false,jellyBurstN:4,autoOn:false,autoMode:'interval',autoSec:8,autoPower:1,autoBall:true,autoViewer:true};
 function ddCfg(){
  if(!extension_settings[EXT])extension_settings[EXT]={};
  const c=extension_settings[EXT];
@@ -32,8 +32,10 @@ function ddJellyCfg(){
  if(typeof c.jellyTap!=='boolean')c.jellyTap=true;
  if(typeof c.jellyDrag!=='boolean')c.jellyDrag=true;
  if(typeof c.jellyShake!=='boolean')c.jellyShake=false;
- return {on:c.jellyOn,scope:['smudge','whole'].includes(c.jellyScope)?c.jellyScope:'local',tap:false,drag:c.jellyDrag,shake:c.jellyShake,amp:{soft:.35,mid:.5,bouncy:.65}[c.jellyStrength]||.5,reach:ddJellyReach()};
+ return {burst:c.jellyBurst===true,on:c.jellyOn,scope:['smudge','whole'].includes(c.jellyScope)?c.jellyScope:'local',tap:false,drag:c.jellyDrag,shake:c.jellyShake,amp:{soft:.35,mid:.5,bouncy:.65}[c.jellyStrength]||.5,reach:ddJellyReach()};
 }
+// 点一下连晃几下：每隔 ~0.23 秒随机推一次，共 n 次（默认 4）。
+function ddBurst(img,n){const total=Math.max(2,Math.min(12,Number(n)||Number(ddCfg().jellyBurstN)||4));let i=0;const go=()=>{if(!img.isConnected||!img._ddKick)return;img._ddKick(1.1);if(++i<total)setTimeout(go,230);};go();}
 function ddJellyBrush(){const b=Number(ddCfg().jellyBrush);return Number.isFinite(b)&&b>0?Math.max(.02,Math.min(.2,b)):.075;}
 function ddJellyState(img){
  if(!img._ddJ)img._ddJ={mask:new Float32Array(DD_JELLY_MW*DD_JELLY_MH),has:false,selecting:false};
@@ -64,7 +66,7 @@ function ddAttachJelly(img){
  try{const pc=document.createElement('canvas');probeOk=!!(pc.getContext('webgl')||pc.getContext('experimental-webgl'));}catch{}
  if(!probeOk)return ddAttachJellyWhole(img,conf);
  const ac=new AbortController();img._ddJellyAbort=ac;const sig={signal:ac.signal};
- const wantPointer=conf.tap||conf.drag||S.selecting;
+ const wantPointer=conf.tap||conf.drag||conf.burst||S.selecting;
  if(wantPointer){img.draggable=false;img.style.touchAction='none';img.style.webkitUserDrag='none';}
  const MW=DD_JELLY_MW,MH=DD_JELLY_MH;
  let canvas=null,selCv=null,gl=null,prog=null,posBuf=null,idxCount=0,tex=null,texSrc='',cols=0,rows=0,pos=null,locPos=0,boxW=0,boxH=0,failed=false;
@@ -220,7 +222,7 @@ function ddAttachJelly(img){
  };
  img.addEventListener('pointerdown',e=>{
   if(e.pointerType==='mouse'&&e.button!==0)return;
-  if(!S.selecting&&!conf.tap&&!conf.drag)return;
+  if(!S.selecting&&!conf.tap&&!conf.drag&&!conf.burst)return;
   if(!ensure()){if(failed)ddAttachJellyWhole(img,conf);return;}
   const [px,py]=local(e);
   try{img.setPointerCapture(e.pointerId);}catch{}
@@ -270,6 +272,7 @@ function ddAttachJelly(img){
   if(!press||(e&&e.pointerId!==press.id))return;
   const p=press;press=null;p.smudging=false;try{img.releasePointerCapture(p.id);}catch{}
   if(p.paint){return;}
+  if(conf.burst&&!S.selecting&&!p.moved&&Date.now()-p.t<450){ddBurst(img);}
   Object.assign(dep,{k:.15,d:.78});Object.assign(ox,{k:.13,d:.8});Object.assign(oy,{k:.13,d:.8});
   dep.t=0;ox.t=0;oy.t=0;
   if(scope==='whole'){
@@ -308,7 +311,7 @@ function ddAttachJellyWhole(img,conf){
  // 每次打开都按当前设置重新决定是否启用；上一次绑的监听用 AbortController 统一撤掉。
  img._ddJellyAbort?.abort();img._ddJellyAbort=null;
  img.style.transform='';img.style.touchAction='';img.style.transformOrigin='';
- if(!conf.on||(!conf.tap&&!conf.drag))return;
+ if(!conf.on||(!conf.tap&&!conf.drag&&!conf.burst))return;
  const ac=new AbortController();img._ddJellyAbort=ac;const sig={signal:ac.signal};
  img.draggable=false;img.style.touchAction='none';img.style.willChange='transform';img.style.webkitUserDrag='none';
  // 状态：x=[tx,ty,sx,sy,rot]，v=速度，t=目标
@@ -357,6 +360,7 @@ function ddAttachJellyWhole(img,conf){
   if(!drag||(e&&e.pointerId!==drag.id))return;
   const d=drag;drag=null;try{img.releasePointerCapture(d.id);}catch{}
   const quick=Date.now()-d.t<450&&!d.moved;
+  if(quick&&conf.burst){ddBurst(img);rest();return;}
   if(quick&&conf.tap){squish();return;}
   if(d.moved&&conf.drag){
    // 松手：保留当前拉伸状态，并给一点反向速度，弹簧会带来 Q 弹的过冲。
@@ -374,7 +378,7 @@ function ddBuildBar(overlay){
    bar.innerHTML='<div class="dd-jb-head"><button type="button" data-jb="power"></button><button type="button" data-jb="more">设置 ▴</button><button type="button" data-jb-tool="add" aria-label="增加选区（画笔）" title="增加选区" hidden><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19z"/><path d="M14 7l3 3"/></svg></button><button type="button" data-jb-tool="erase" aria-label="擦除选区（橡皮）" title="擦除选区" hidden><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 20h12"/><path d="M5 15l8-8a2 2 0 0 1 3 0l3 3a2 2 0 0 1 0 3l-6 6H9z"/><path d="M9 11l6 6"/></svg></button><button type="button" data-jb="clr" aria-label="清除全部选区" title="清除全部选区" hidden><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg></button><button type="button" data-jb="done" aria-label="完成选区" title="完成" hidden><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></button><label class="dd-jb-brush" hidden title="画笔粗细"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/></svg><input type="range" min="2" max="20" step="1" data-jb-brush aria-label="画笔粗细"></label></div>'
     +'<div class="dd-jb-panel" hidden><div class="dd-jb-row"><b>范围</b><button type="button" data-jb-scope="local">局部</button><button type="button" data-jb-scope="smudge">抹开</button><button type="button" data-jb-scope="whole">全屏</button></div>'
     +'<div class="dd-jb-row"><b>选区</b><button type="button" data-jb="sel">✎ 涂选区</button><button type="button" data-jb="clr2">清除</button><em class="dd-jb-hint"></em></div>'
-    +'<div class="dd-jb-row"><b>交互</b><button type="button" data-jb-in="drag">拖动</button><button type="button" data-jb-in="shake">摇晃</button>'
+    +'<div class="dd-jb-row"><b>交互</b><button type="button" data-jb-in="drag">拖动</button><button type="button" data-jb-in="shake">摇晃</button><button type="button" data-jb-in="burst" title="点一下图，自己连晃几下">点一下连晃</button>'
     +'<span class="dd-jb-dd"><button type="button" class="dd-jb-dd-btn" data-jb-dd aria-haspopup="listbox" aria-expanded="false"><span data-jb-dd-label>Q弹</span> ▾</button><span class="dd-jb-dd-list" role="listbox" hidden><button type="button" role="option" data-jb-strength="soft">软糯</button><button type="button" role="option" data-jb-strength="mid">Q弹</button><button type="button" role="option" data-jb-strength="bouncy">DUANG</button></span></span></div>'
     +'<div class="dd-jb-row"><b>反馈</b><span class="dd-jb-brush dd-jb-reach"><small>小</small><input type="range" min="40" max="220" step="5" data-jb-reach aria-label="反馈范围"><small>大</small></span><em class="dd-jb-hint">手指按下去影响多大一块</em></div>'
     +'<div class="dd-jb-msg" role="status"></div></div>';
@@ -385,7 +389,7 @@ function ddBuildBar(overlay){
     $b('[data-jb=power]').textContent=c.on?'果冻：开':'果冻：关';$b('[data-jb=power]').classList.toggle('is-active',c.on);
     bar.classList.toggle('is-off',!c.on);bar.classList.toggle('is-selecting',!!S.selecting);
     bar.querySelectorAll('[data-jb-scope]').forEach(b=>b.classList.toggle('is-active',b.dataset.jbScope===c.scope));
-    const ins={tap:c.tap,drag:c.drag,shake:c.shake};const stv=['soft','bouncy'].includes(ddCfg().jellyStrength)?ddCfg().jellyStrength:'mid';bar.querySelectorAll('[data-jb-strength]').forEach(b=>b.classList.toggle('is-active',b.dataset.jbStrength===stv));{const lab=$b('[data-jb-dd-label]');if(lab)lab.textContent={soft:'软糯',mid:'Q弹',bouncy:'DUANG'}[stv];}bar.querySelectorAll('[data-jb-in]').forEach(b=>b.classList.toggle('is-active',!!ins[b.dataset.jbIn]));
+    const ins={tap:c.tap,drag:c.drag,shake:c.shake,burst:c.burst};const stv=['soft','bouncy'].includes(ddCfg().jellyStrength)?ddCfg().jellyStrength:'mid';bar.querySelectorAll('[data-jb-strength]').forEach(b=>b.classList.toggle('is-active',b.dataset.jbStrength===stv));{const lab=$b('[data-jb-dd-label]');if(lab)lab.textContent={soft:'软糯',mid:'Q弹',bouncy:'DUANG'}[stv];}bar.querySelectorAll('[data-jb-in]').forEach(b=>b.classList.toggle('is-active',!!ins[b.dataset.jbIn]));
     {const ri=$b('[data-jb-reach]');if(ri&&document.activeElement!==ri)ri.value=Math.round(ddJellyReach()*100);}
     $b('[data-jb=sel]').classList.toggle('is-active',!!S.selecting);
     $b('.dd-jb-hint').textContent=S.has?'已选区（只有选中的地方会动）':'未选区（整张图都会动）';
@@ -426,7 +430,7 @@ function ddBuildBar(overlay){
     if(d.jbDd!==undefined){const l=$b('.dd-jb-dd-list'),p=$b('.dd-jb-panel');l.hidden=!l.hidden;p.classList.toggle('is-dd-open',!l.hidden);b.setAttribute('aria-expanded',String(!l.hidden));return;}
     if(d.jbStrength){c.jellyStrength=d.jbStrength;ddSave();{const l=$b('.dd-jb-dd-list'),p=$b('.dd-jb-panel');l.hidden=true;p.classList.remove('is-dd-open');$b('[data-jb-dd]').setAttribute('aria-expanded','false');}rebind();return;}
     if(d.jbIn){
-     ddJellyCfg();const key={tap:'jellyTap',drag:'jellyDrag',shake:'jellyShake'}[d.jbIn];c[key]=!c[key];if(c[key])c.jellyOn=true;ddSave();
+     ddJellyCfg();const key={tap:'jellyTap',drag:'jellyDrag',shake:'jellyShake',burst:'jellyBurst'}[d.jbIn];c[key]=!c[key];if(c[key])c.jellyOn=true;ddSave();
      if(d.jbIn==='shake'&&c.jellyShake){setMsg('');await ddJellyEnableMotion(setMsg);}
      else if(d.jbIn==='shake')setMsg('');
      rebind();
