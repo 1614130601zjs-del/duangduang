@@ -58,6 +58,9 @@ dialog.dd-viewer .dd-jelly-bar .dd-jb-brush input{width:84px;accent-color:var(--
 
 /* 设置面板里的小排版 */
 #dd-settings .dd-set-row{display:flex;align-items:center;gap:8px;margin:6px 0}
+#dd-settings .dd-image-tool-actions{display:flex;flex-wrap:wrap;gap:8px}
+#dd-settings .dd-image-tool-actions button{flex:1;min-width:110px;min-height:36px}
+#dd-settings .dd-image-tool-actions button:disabled{opacity:.45;cursor:not-allowed}
 #dd-settings small{display:block;opacity:.7;margin-top:6px}
 
 #dd-settings .dd-icons{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}
