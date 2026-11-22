@@ -607,14 +607,12 @@ async function ddFinishBgEraser(dlg){
 }
 function ddApplyAutoFloat(dlg,enabled){
  if(!dlg)return;
- const stage=dlg.querySelector('.dd-stage'),bar=dlg.querySelector('.dd-jelly-bar');
- if(!stage)return;
  if(!enabled){
   const state=dlg._ddFloatState;if(!state)return;
   state.stage.style.transform='';state.stage.style.transformOrigin='';
   state.stage.style.position='';state.stage.style.left='';state.stage.style.top='';
   dlg.append(state.stage);if(state.bar)dlg.append(state.bar);
-  state.shell.remove();dlg._ddFloatState=null;
+  dlg._ddFloatingImg=null;state.shell.remove();dlg._ddFloatState=null;
   if(!dlg.open&&typeof dlg.showModal==='function')dlg.showModal();
   ddBallInto(dlg);ddAttachJelly(state.stage.querySelector('img'));dlg._ddPaintBar?.();return;
  }
@@ -628,7 +626,7 @@ function ddApplyAutoFloat(dlg,enabled){
  back.addEventListener('click',()=>ddApplyAutoFloat(dlg,false));
  shell.append(move,back);
  const state={shell,stage,bar,scale:.62,left:0,top:0,baseW:0,baseH:0};
- dlg._ddFloatState=state;
+ dlg._ddFloatState=state;dlg._ddFloatingImg=stage.querySelector('img');
  shell.append(stage);if(bar)shell.append(bar);document.body.append(shell);
  if(dlg.open)dlg.close();
  requestAnimationFrame(()=>{
