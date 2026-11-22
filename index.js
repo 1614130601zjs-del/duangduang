@@ -312,12 +312,13 @@ function ddAttachJelly(img){
   dep.t=0;ox.t=0;oy.t=0;
   if(scope==='whole'){
    const quick=Date.now()-p.t<450&&!p.moved;
-   if(quick&&conf.tap){ddPlaySound('tap');aff.x[2]=1+.11*amp;aff.x[3]=1-.14*amp;aff.v[2]=0;aff.v[3]=0;}
+   if(quick&&conf.tap){aff.x[2]=1+.11*amp;aff.x[3]=1-.14*amp;aff.v[2]=0;aff.v[3]=0;}
    else if(p.moved&&conf.drag){ddPlaySound('release');aff.v[2]-=(aff.x[2]-1)*.35;aff.v[3]-=(aff.x[3]-1)*.35;}
    aff.t=[0,0,1,1,0];
   }
+  if(!S.selecting&&!p.moved&&Date.now()-p.t<450&&!conf.burst)ddPlaySound('tap'); else if(p.moved&&conf.drag)ddPlaySound('release');
   kick();
-  if(scope!=='whole'&&!S.selecting&&!p.moved&&Date.now()-p.t<450&&conf.tap)ddPlaySound('tap');\n  if(scope!=='whole'&&p.moved&&conf.drag)ddPlaySound('release');\n  if(conf.burst&&!S.selecting&&!p.moved&&Date.now()-p.t<450)ddBurst(img,[cx,cy]);
+  if(conf.burst&&!S.selecting&&!p.moved&&Date.now()-p.t<450)ddBurst(img,[cx,cy]);
  };
  img.addEventListener('pointerup',end,sig);img.addEventListener('pointercancel',end,sig);
  img.addEventListener('contextmenu',e=>{if(press)e.preventDefault();},sig);
@@ -404,6 +405,7 @@ function ddAttachJellyWhole(img,conf){
   if(!drag||(e&&e.pointerId!==drag.id))return;
   const d=drag;drag=null;try{img.releasePointerCapture(d.id);}catch{}
   const quick=Date.now()-d.t<450&&!d.moved;
+  if(quick&&!conf.burst)ddPlaySound('tap'); else if(d.moved&&conf.drag)ddPlaySound('release');
   if(quick&&conf.burst){ddBurst(img);rest();return;}
   if(quick&&conf.tap){squish();return;}
   if(d.moved&&conf.drag){
