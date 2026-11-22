@@ -20,7 +20,24 @@ const ddSave=()=>{try{saveSettingsDebounced();}catch{}};
 
 // ===== 果冻互动音效：程序化合成带掌面厚度的巴掌声 =====
 let ddAudioCtx=null;
+const DD_SLAP_URL='https://cdn.jsdelivr.net/gh/1614130601zjs-del/duangduang@feature/tap-sfx/assets/slap.mp3';
+let ddSlapAudio=null;
 function ddPlaySound(kind='tap',strength=1){
+ const c=ddCfg();if(!c.sfxOn)return;
+ if(kind==='burst'){
+  try{
+   if(!ddSlapAudio){ddSlapAudio=new Audio(DD_SLAP_URL);ddSlapAudio.preload='auto';}
+   const a=ddSlapAudio;
+   a.volume=Math.min(1,Math.max(0,Number(c.sfxVolume)||0)*Math.max(.25,Math.min(1.5,Number(strength)||1)));
+   a.currentTime=0;
+   const playing=a.play();
+   if(playing&&typeof playing.catch==='function')playing.catch(()=>ddPlaySynth(kind,strength));
+   return;
+  }catch{}
+ }
+ ddPlaySynth(kind,strength);
+}
+function ddPlaySynth(kind='tap',strength=1){
  const c=ddCfg();if(!c.sfxOn)return;
  const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;
  try{
