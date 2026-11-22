@@ -4,7 +4,7 @@ import { extension_settings } from '/scripts/extensions.js';
 import { saveSettingsDebounced, getRequestHeaders } from '/script.js';
 
 const EXT='duangduang';
-const defaults={ballOn:true,ballX:1,ballY:.62,ballShake:true,ballIcon:'default',ballIconPicked:false,ballFixed:26,ballCustoms:[],ballSize:56,jellyOn:true,jellyScope:'local',jellyTap:false,jellyDrag:true,jellyShake:false,jellyStrength:'mid',jellyBrush:.075,jellyBurst:false,jellyBurstN:3,jellyBurstMode:'wobble',jellyBurstDecay:true,jellyBurstPower:1,autoOn:false,autoMode:'interval',autoSec:8,autoPower:1,autoBall:true,autoViewer:true};
+const defaults={ballOn:true,ballX:1,ballY:.62,ballShake:true,ballIcon:'default',ballIconPicked:false,ballFixed:26,ballCustoms:[],ballSize:56,jellyOn:true,jellyScope:'local',jellyTap:false,jellyDrag:true,jellyShake:false,jellyStrength:'mid',jellyBrush:.075,jellyBurst:false,jellyBurstN:3,jellyBurstMode:'wobble',jellyBurstDecay:true,jellyBurstPower:1,sfxOn:false,sfxVolume:.45,autoOn:false,autoMode:'interval',autoSec:8,autoPower:1,autoBall:true,autoViewer:true};
 function ddCfg(){
  if(!extension_settings[EXT])extension_settings[EXT]={};
  const c=extension_settings[EXT];
@@ -17,6 +17,32 @@ function ddCfg(){
  return c;
 }
 const ddSave=()=>{try{saveSettingsDebounced();}catch{}};
+
+// ===== 轻量果冻音效：Web Audio 合成，不加载外部音频文件 =====
+let ddAudioCtx=null;
+function ddPlaySound(kind='tap',strength=1){
+ const c=ddCfg();if(!c.sfxOn)return;
+ const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;
+ try{
+  if(!ddAudioCtx)ddAudioCtx=new Ctx();
+  const ac=ddAudioCtx;if(ac.state==='suspended')ac.resume();
+  const now=ac.currentTime,vol=Math.max(0,Math.min(1,Number(c.sfxVolume)||0))*Math.max(.25,Math.min(1.5,Number(strength)||1));
+  if(!vol)return;
+  const gain=ac.createGain();gain.gain.setValueAtTime(.0001,now);
+  gain.gain.exponentialRampToValueAtTime(Math.max(.0002,vol*(kind==='release'?.12:.2)),now+.008);
+  gain.gain.exponentialRampToValueAtTime(.0001,now+(kind==='release'?.19:.105));gain.connect(ac.destination);
+  const osc=ac.createOscillator();osc.type=kind==='release'?'sine':'triangle';
+  const start=kind==='release'?420:kind==='burst'?680:920,end=kind==='release'?150:kind==='burst'?210:260;
+  osc.frequency.setValueAtTime(start,now);osc.frequency.exponentialRampToValueAtTime(end,now+(kind==='release'?.18:.095));
+  osc.connect(gain);osc.start(now);osc.stop(now+(kind==='release'?.2:.11));
+  if(kind!=='release'){
+   const click=ac.createOscillator(),cg=ac.createGain();click.type='sine';
+   click.frequency.setValueAtTime(1450,now);click.frequency.exponentialRampToValueAtTime(620,now+.025);
+   cg.gain.setValueAtTime(vol*.10,now);cg.gain.exponentialRampToValueAtTime(.0001,now+.035);
+   click.connect(cg);cg.connect(ac.destination);click.start(now);click.stop(now+.04);
+  }
+ }catch{}
+}
 
 // ===== 放大图小互动（果冻）：范围（局部 / 抹开 / 全屏）× 选区（可选）× 交互（点击 / 拖动 / 摇晃） =====
 // 弹簧动画只在触摸 / 拖动 / 摇晃时跑，松手停稳后自动结束；选区只在放大图打开期间保留。
@@ -41,7 +67,7 @@ function ddBurst(img,pt){
  const go=()=>{
   if(!img.isConnected)return;
   const fac=b.decay?(b.n>1?1-i/b.n*.82:1):1,k=b.power*fac;
-  if(b.mode==='press')img._ddPress?.(k,pt);else img._ddKick?.(k*.55);
+  ddPlaySound('burst',k);if(b.mode==='press')img._ddPress?.(k,pt);else img._ddKick?.(k*.55);
   if(++i<b.n)setTimeout(go,b.mode==='press'?420:230);
  };
  go();
@@ -286,12 +312,12 @@ function ddAttachJelly(img){
   dep.t=0;ox.t=0;oy.t=0;
   if(scope==='whole'){
    const quick=Date.now()-p.t<450&&!p.moved;
-   if(quick&&conf.tap){aff.x[2]=1+.11*amp;aff.x[3]=1-.14*amp;aff.v[2]=0;aff.v[3]=0;}
-   else if(p.moved&&conf.drag){aff.v[2]-=(aff.x[2]-1)*.35;aff.v[3]-=(aff.x[3]-1)*.35;}
+   if(quick&&conf.tap){ddPlaySound('tap');aff.x[2]=1+.11*amp;aff.x[3]=1-.14*amp;aff.v[2]=0;aff.v[3]=0;}
+   else if(p.moved&&conf.drag){ddPlaySound('release');aff.v[2]-=(aff.x[2]-1)*.35;aff.v[3]-=(aff.x[3]-1)*.35;}
    aff.t=[0,0,1,1,0];
   }
   kick();
-  if(conf.burst&&!S.selecting&&!p.moved&&Date.now()-p.t<450)ddBurst(img,[cx,cy]);
+  if(scope!=='whole'&&!S.selecting&&!p.moved&&Date.now()-p.t<450&&conf.tap)ddPlaySound('tap');\n  if(scope!=='whole'&&p.moved&&conf.drag)ddPlaySound('release');\n  if(conf.burst&&!S.selecting&&!p.moved&&Date.now()-p.t<450)ddBurst(img,[cx,cy]);
  };
  img.addEventListener('pointerup',end,sig);img.addEventListener('pointercancel',end,sig);
  img.addEventListener('contextmenu',e=>{if(press)e.preventDefault();},sig);
@@ -860,7 +886,7 @@ function ddMountSettings(){
   +'<div class="dd-set-row" id="dd-auto-sec-row"><label for="dd-auto-sec">间隔</label><input id="dd-auto-sec" type="range" min="2" max="60" step="1"><span id="dd-auto-sec-v"></span></div>'
   +'<div class="dd-set-row"><label for="dd-auto-power">力度</label><input id="dd-auto-power" type="range" min="30" max="200" step="5"><span id="dd-auto-power-v"></span></div>'
   +'<div class="dd-set-row"><label class="checkbox_label"><input id="dd-auto-ball" type="checkbox"><span>悬浮球</span></label><label class="checkbox_label"><input id="dd-auto-viewer" type="checkbox"><span>放大后的图</span></label></div></div>'
-  +'<div class="dd-set-row"><b>点一下连晃</b><small>（在放大图下方的“交互”里打开“点一下连晃”）</small></div>'
+  +'<div class="dd-set-row"><b>果冻音效</b></div><label class="checkbox_label"><input id="dd-sfx-on" type="checkbox"><span>启用音效（戳击 / 回弹 / 连续弹动）</span></label>'\n  +'<div class="dd-set-row"><label for="dd-sfx-volume">音量</label><input id="dd-sfx-volume" type="range" min="0" max="100" step="5"><span id="dd-sfx-volume-v"></span></div>'\n  +'<small class="dd-note">使用浏览器实时合成短音效，不需要下载音频文件。</small>'\n  +'<div class="dd-set-row"><b>点一下连晃</b><small>（在放大图下方的“交互”里打开“点一下连晃”）</small></div>'
   +'<div class="dd-set-row"><label for="dd-burst-mode">模式</label><select id="dd-burst-mode" class="text_pole"><option value="wobble">摇晃（随机方向晃几下）</option><option value="press">点击反馈（按压回弹，重复几次）</option></select></div>'
   +'<div class="dd-set-row"><label for="dd-burst-n">次数</label><input id="dd-burst-n" type="range" min="1" max="10" step="1"><span id="dd-burst-n-v"></span></div>'
   +'<div class="dd-set-row"><label for="dd-burst-power">幅度</label><input id="dd-burst-power" type="range" min="20" max="200" step="5"><span id="dd-burst-power-v"></span></div>'
@@ -876,6 +902,11 @@ function ddMountSettings(){
   const paint=()=>{const c=ddCfg();on.checked=!!c.autoOn;mode.value=['interval','random','always'].includes(c.autoMode)?c.autoMode:'interval';sec.value=c.autoSec;pw.value=Math.round(c.autoPower*100);ab.checked=c.autoBall!==false;av.checked=c.autoViewer!==false;q('#dd-auto-sec-v').textContent=c.autoSec+' 秒'+(c.autoMode==='random'?'起（随机到 2 倍）':'');q('#dd-auto-power-v').textContent=Math.round(c.autoPower*100)+'%';b.style.display=c.autoOn?'':'none';row.style.display=c.autoMode==='always'?'none':'';};
   const set=()=>{const c=ddCfg();c.autoOn=on.checked;c.autoMode=mode.value;c.autoSec=Number(sec.value);c.autoPower=Number(pw.value)/100;c.autoBall=ab.checked;c.autoViewer=av.checked;ddSave();paint();ddAutoStart();};
   [on,mode,sec,pw,ab,av].forEach(el=>el.addEventListener('input',set));paint();}
+ {const so=box.querySelector('#dd-sfx-on'),sv=box.querySelector('#dd-sfx-volume'),vv=box.querySelector('#dd-sfx-volume-v');
+  const paint=()=>{const k=ddCfg();so.checked=!!k.sfxOn;sv.value=String(Math.round(Math.max(0,Math.min(1,Number(k.sfxVolume)||0))*100));vv.textContent=sv.value+'%';};
+  const set=()=>{const k=ddCfg();k.sfxOn=so.checked;k.sfxVolume=Number(sv.value)/100;ddSave();paint();};
+  so.addEventListener('change',set);sv.addEventListener('input',set);paint();
+ }
  const on=box.querySelector('#dd-ball-on'),st=box.querySelector('#dd-strength');
  on.checked=!!c.ballOn;on.onchange=()=>{ddCfg().ballOn=on.checked;ddSave();ddMountBall();};
  st.value=['soft','bouncy'].includes(c.jellyStrength)?c.jellyStrength:'mid';st.onchange=()=>{ddCfg().jellyStrength=st.value;ddSave();};
