@@ -28,19 +28,35 @@ function ddPlaySound(kind='tap',strength=1){
   const ac=ddAudioCtx;if(ac.state==='suspended')ac.resume();
   const now=ac.currentTime,vol=Math.max(0,Math.min(1,Number(c.sfxVolume)||0))*Math.max(.25,Math.min(1.5,Number(strength)||1));
   if(!vol)return;
-  const gain=ac.createGain();gain.gain.setValueAtTime(.0001,now);
-  gain.gain.exponentialRampToValueAtTime(Math.max(.0002,vol*(kind==='release'?.12:.2)),now+.008);
-  gain.gain.exponentialRampToValueAtTime(.0001,now+(kind==='release'?.19:.105));gain.connect(ac.destination);
-  const osc=ac.createOscillator();osc.type=kind==='release'?'sine':'triangle';
-  const start=kind==='release'?420:kind==='burst'?680:920,end=kind==='release'?150:kind==='burst'?210:260;
-  osc.frequency.setValueAtTime(start,now);osc.frequency.exponentialRampToValueAtTime(end,now+(kind==='release'?.18:.095));
-  osc.connect(gain);osc.start(now);osc.stop(now+(kind==='release'?.2:.11));
-  if(kind!=='release'){
-   const click=ac.createOscillator(),cg=ac.createGain();click.type='sine';
-   click.frequency.setValueAtTime(1450,now);click.frequency.exponentialRampToValueAtTime(620,now+.025);
-   cg.gain.setValueAtTime(vol*.10,now);cg.gain.exponentialRampToValueAtTime(.0001,now+.035);
-   click.connect(cg);cg.connect(ac.destination);click.start(now);click.stop(now+.04);
+  const release=kind==='release',burst=kind==='burst';
+  // “啪”的主体：极短的宽频拍击声，先脆后收，不做持续音高滑翔。
+  const duration=release?.045:(burst?.052:.048);
+  const length=Math.max(1,Math.floor(ac.sampleRate*duration));
+  const buffer=ac.createBuffer(1,length,ac.sampleRate),data=buffer.getChannelData(0);
+  for(let i=0;i<length;i++){
+   const t=i/length;
+   const envelope=Math.pow(1-t,release?3.8:2.2);
+   data[i]=(Math.random()*2-1)*envelope;
   }
+  const noise=ac.createBufferSource();noise.buffer=buffer;
+  const filter=ac.createBiquadFilter();filter.type='bandpass';
+  filter.frequency.setValueAtTime(release?850:1450,now);
+  filter.Q.setValueAtTime(.72,now);
+  const slap=ac.createGain();slap.gain.setValueAtTime(.0001,now);
+  slap.gain.exponentialRampToValueAtTime(Math.max(.0002,vol*(release?.10:(burst?.42:.52))),now+.0025);
+  slap.gain.exponentialRampToValueAtTime(.0001,now+duration);
+  noise.connect(filter);filter.connect(slap);slap.connect(ac.destination);
+  noise.start(now);noise.stop(now+duration);
+  // 很短的低频掌肉感，像拍在软软的果冻上；避免尖锐的“biu”音。
+  const body=ac.createOscillator(),bodyGain=ac.createGain();
+  body.type='sine';
+  body.frequency.setValueAtTime(release?155:118,now);
+  body.frequency.exponentialRampToValueAtTime(release?82:58,now+(release?.055:.082));
+  bodyGain.gain.setValueAtTime(.0001,now);
+  bodyGain.gain.exponentialRampToValueAtTime(Math.max(.0002,vol*(release?.13:(burst?.34:.40))),now+.003);
+  bodyGain.gain.exponentialRampToValueAtTime(.0001,now+(release?.065:.095));
+  body.connect(bodyGain);bodyGain.connect(ac.destination);
+  body.start(now);body.stop(now+(release?.07:.10));
  }catch{}
 }
 
