@@ -1182,8 +1182,9 @@ function ddMountSettings(){
 // 用法：window.DuangDuang?.openImage('/backgrounds/xxx.png')，返回 Promise<boolean>（true=已打开）。
 // 同源路径、data:、blob:、http(s) 地址都可以；同源图片可以用局部 / 选区 / 摇晃的全部效果。
 window.DuangDuang={
- version:'0.5.0',
+ version:'0.6.9',
  ready:true,
+ playSound(kind='tap',strength=1){ddPlaySound(kind,strength);},
  async openImage(src){
   try{
    const url=await ddMaterialize(String(src||'').trim());
