@@ -538,7 +538,7 @@ async function dbDelete(key){const db=await openAssetDB();return new Promise((re
 let maskSaveTimer=0;
 function ddPersistMask(img,S){if(!img||!S)return;clearTimeout(maskSaveTimer);maskSaveTimer=setTimeout(()=>{dbPut('pet-mask',{mask:Array.from(S.mask),has:S.has}).catch(e=>console.warn('[小小桌宠] 选区保存失败',e));},180);}
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-let petUrl='',petRoot=null,petImage=null,petFloat=null,petFloatState=null,petBlob=null,petEraser=null,petEraserHistory=[],activeGalleryId=null;
+let petUrl='',petRoot=null,petImage=null,petFloat=null,petFloatState=null,petBlob=null,petEraser=null,petEraserHistory=[],activeGalleryId=null,petExternalMode=false;
 function saveCfg(){try{saveSettingsDebounced();}catch{}}
 function toast(t){const el=document.querySelector('#lp-toast');if(!el)return;el.textContent=t;el.classList.add('is-visible');clearTimeout(el._timer);el._timer=setTimeout(()=>el.classList.remove('is-visible'),2100);}
 function detachPet(){if(petImage)petImage._ddJellyAbort?.abort();if(petFloat)petFloat.remove();petFloat=null;petFloatState=null;petRoot?.remove();petRoot=null;petImage=null;}
@@ -651,8 +651,8 @@ function mount(){
  // 将操作面板直接挂到 body，脱离酒馆可能带有 transform 的扩展容器，避免 fixed 定位偏移。
  document.body.append(panel);
  const rememberFloatState=f=>{if(!f)return;const r=f.getBoundingClientRect();petFloatState={left:r.left,top:r.top,width:r.width,height:r.height,scale:f._lpCurrentScale||1};};
- const returnPetToEditor=()=>{if(!petFloat||!petRoot)return false;rememberFloatState(petFloat);petFloat.remove();petFloat=null;petRoot.style.transform='';petRoot.style.transformOrigin='';panel.querySelector('#lp-stage').append(petRoot);petImage._ddJellyRehost?.();ddAttachJelly(petImage);petImage._ddJellyPrepare?.();petRoot._ddPaintBar?.();return true;};
- const open=()=>{if(petFloat)returnPetToEditor();panel.classList.add('is-open');panel.setAttribute('aria-hidden','false');requestAnimationFrame(()=>{if(!petImage)return;petImage._ddJellyRehost?.();ddAttachJelly(petImage);petImage._ddJellyPrepare?.();});};
+ const returnPetToEditor=()=>{if(!petFloat||!petRoot)return false;rememberFloatState(petFloat);petFloat.remove();petFloat=null;petRoot.style.transform='';petRoot.style.transformOrigin='';panel.querySelector('#lp-stage').append(petRoot);petImage._ddJellyRehost?.();ddAttachJelly(petImage);petImage._ddJellyPrepare?.();petRoot._ddPaintBar?.();if(petExternalMode){petExternalMode=false;window.dispatchEvent(new CustomEvent('duangduang:pet-float-returned',{detail:{blob:petBlob}}));return 'external';}return true;};
+ const open=()=>{if(petFloat&&returnPetToEditor()==='external')return;panel.classList.add('is-open');panel.setAttribute('aria-hidden','false');requestAnimationFrame(()=>{if(!petImage)return;petImage._ddJellyRehost?.();ddAttachJelly(petImage);petImage._ddJellyPrepare?.();});};
  const close=()=>{if(petEraser)ddSetEraser(false);panel.classList.remove('is-open');panel.setAttribute('aria-hidden','true');};
  const injectWandButton=()=>{
   const menu=document.querySelector('#extensionsMenu');if(!menu)return false;
@@ -710,7 +710,7 @@ function mount(){
    f.addEventListener('dragstart',e=>e.preventDefault(),true);
    let petHoldTimer=0,petHoldStart=null;
    // 手机长按会先触发“右键菜单”：拦掉它，并把它当作长按本身，直接回编辑页（不再依赖后面的 0.62 秒计时，也不会被取消）。
-   f.addEventListener('contextmenu',e=>{e.preventDefault();if(!petHoldStart||!e.target.closest('.lp-image-host'))return;clearTimeout(petHoldTimer);petHoldStart=null;returnPetToEditor();open();},true);f.addEventListener('pointerdown',e=>{if(!e.target.closest('.lp-image-host'))return;petHoldStart={x:e.clientX,y:e.clientY,id:e.pointerId};clearTimeout(petHoldTimer);petHoldTimer=setTimeout(()=>{if(!petHoldStart)return;petHoldStart=null;returnPetToEditor();open();},620);},true);f.addEventListener('pointermove',e=>{if(!petHoldStart||petHoldStart.id!==e.pointerId)return;if(Math.hypot(e.clientX-petHoldStart.x,e.clientY-petHoldStart.y)>10){clearTimeout(petHoldTimer);petHoldStart=null;}},true);const clearPetHold=()=>{clearTimeout(petHoldTimer);petHoldStart=null;};f.addEventListener('pointerup',clearPetHold,true);f.addEventListener('pointercancel',clearPetHold,true);const dragZone=document.createElement('div');dragZone.className='lp-float-drag';dragZone.setAttribute('aria-label','移动桌宠');f.append(dragZone);
+   f.addEventListener('contextmenu',e=>{e.preventDefault();if(!petHoldStart||!e.target.closest('.lp-image-host'))return;clearTimeout(petHoldTimer);petHoldStart=null;if(returnPetToEditor()===true)open();},true);f.addEventListener('pointerdown',e=>{if(!e.target.closest('.lp-image-host'))return;petHoldStart={x:e.clientX,y:e.clientY,id:e.pointerId};clearTimeout(petHoldTimer);petHoldTimer=setTimeout(()=>{if(!petHoldStart)return;petHoldStart=null;if(returnPetToEditor()===true)open();},620);},true);f.addEventListener('pointermove',e=>{if(!petHoldStart||petHoldStart.id!==e.pointerId)return;if(Math.hypot(e.clientX-petHoldStart.x,e.clientY-petHoldStart.y)>10){clearTimeout(petHoldTimer);petHoldStart=null;}},true);const clearPetHold=()=>{clearTimeout(petHoldTimer);petHoldStart=null;};f.addEventListener('pointerup',clearPetHold,true);f.addEventListener('pointercancel',clearPetHold,true);const dragZone=document.createElement('div');dragZone.className='lp-float-drag';dragZone.setAttribute('aria-label','移动桌宠');f.append(dragZone);
    // 双击桌宠（单击只做互动）：显出虚线边框、移动条和四角圆点，可以拖动、缩放；3.5 秒没操作或点到窗口外就收起。平时只做互动。
    let frameTimer=0,tapStart=null,lastTap=null;
    const hideFrame=()=>{clearTimeout(frameTimer);f.classList.remove('is-framed');};
@@ -749,6 +749,7 @@ function mount(){
   });
   close();
  });
+ window.addEventListener('duangduang:pet-release-image',async e=>{const blob=e.detail?.blob;if(!blob)return;try{await setPetImage(blob);petExternalMode=true;await setTab('editor');panel.querySelector('#lp-release').click();}catch(err){petExternalMode=false;window.dispatchEvent(new CustomEvent('duangduang:pet-release-failed',{detail:{message:err.message||'桌宠放出失败'}}));toast(err.message||'桌宠放出失败');}});
  panel.querySelector('#lp-reset').addEventListener('click',()=>{if(!petImage)return;petImage._ddJellyAbort?.abort();ddJellyClearSelection(petImage);ddPersistMask(petImage,ddJellyState(petImage));ddAttachJelly(petImage);petImage._ddJellyPrepare?.();toast('互动状态已复位');});
  panel.querySelector('#lp-remove-image').addEventListener('click',async()=>{if(petEraser)await ddSetEraser(false);detachPet();petBlob=null;petEraserHistory=[];await dbDelete('pet-image');await dbDelete('pet-mask');const stage=panel.querySelector('#lp-stage');let empty=stage.querySelector('#lp-empty');if(!empty){empty=document.createElement('div');empty.id='lp-empty';empty.className='lp-empty';empty.innerHTML='<b>放一张图片进来</b><small>支持 PNG、WebP、JPG，建议透明背景立绘</small><button id="lp-upload" type="button">选择图片</button>';empty.querySelector('#lp-upload').addEventListener('click',()=>fileInput.click());}stage.replaceChildren(empty);empty.hidden=false;panel.querySelector('#lp-jelly-slot').replaceChildren();toast('图片已移除');});
  // 编辑器入口由酒馆魔法棒菜单提供；不再创建悬浮球。
