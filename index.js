@@ -540,8 +540,8 @@ function ddToast(text){
  t.textContent=text;t.classList.add('is-on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('is-on'),2600);
 }
 function ddBuildBgTools(dlg){
- const panel=document.createElement('div');panel.className='dd-bg-tools';
- panel.innerHTML='<div class="dd-bg-brushes" hidden><label>笔刷大小 <input type="range" min="1" max="20" value="7" data-bg-size><output data-bg-size-value>7%</output></label><label>软度 <input type="range" min="0" max="100" value="65" data-bg-soft><output data-bg-soft-value>65%</output></label></div><div class="dd-bg-edit-actions" hidden><button type="button" data-bg-action="undo" disabled>撤销</button><button type="button" data-bg-action="cancel">取消</button><button type="button" data-bg-action="done">完成</button></div><small class="dd-bg-status" role="status">从下方「设置」进入图片工具。</small>';
+ const panel=dlg.querySelector('.dd-jb-panel');if(!panel)return null;
+ panel.insertAdjacentHTML('beforeend','<div class="dd-bg-brushes" hidden><label>笔刷大小 <input type="range" min="1" max="20" value="7" data-bg-size><output data-bg-size-value>7%</output></label><label>软度 <input type="range" min="0" max="100" value="65" data-bg-soft><output data-bg-soft-value>65%</output></label></div><div class="dd-bg-edit-actions" hidden><button type="button" data-bg-action="undo" disabled>撤销</button><button type="button" data-bg-action="cancel">取消</button><button type="button" data-bg-action="done">完成</button></div><small class="dd-bg-status" role="status">选择「擦除背景」后即可在图片上涂抹。</small>');
  const q=sel=>panel.querySelector(sel);
  panel.addEventListener('input',e=>{if(e.target.matches('[data-bg-size]'))q('[data-bg-size-value]').textContent=e.target.value+'%';if(e.target.matches('[data-bg-soft]'))q('[data-bg-soft-value]').textContent=e.target.value+'%';});
  panel.addEventListener('click',async e=>{
@@ -697,8 +697,8 @@ function ddOpenViewer(url,sourceEl=null){
  if(!dlg){
   dlg=document.createElement('dialog');dlg.className='dd-viewer';dlg.setAttribute('aria-label','果冻放大图');
   dlg.innerHTML='<button type="button" class="dd-close" aria-label="关闭" title="关闭"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button><div class="dd-stage"><img alt="放大查看的图片" draggable="false"></div>';
-  const tools=ddBuildBgTools(dlg);dlg.append(tools);
-  const bar=ddBuildBar(dlg);dlg.append(bar);bar._ddOwner=dlg;
+  const bar=ddBuildBar(dlg);bar._ddOwner=dlg;
+  ddBuildBgTools(dlg);
   dlg.addEventListener('click',e=>{
    // 手指抬起后系统会补发一个 click，落在刚打开的弹窗上，会被当成点了背景而立刻关掉；打开后短时间内忽略点背景。
    if(e.target===dlg&&Date.now()-(dlg._ddOpenedAt||0)<600)return;
