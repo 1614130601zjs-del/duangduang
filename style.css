@@ -16,7 +16,7 @@
 @keyframes dd-bounce{0%,100%{transform:scale(1,1)}50%{transform:scale(1.04,.97)}}
 
 /* 选图模式：盖住整个页面，拦截点击 */
-.dd-pick{position:fixed;inset:0;z-index:2147481000;background:rgba(0,0,0,.18);touch-action:none;cursor:crosshair;-webkit-user-select:none;user-select:none}
+.dd-pick{position:fixed;inset:0;z-index:2147481000;background:rgba(0,0,0,.18);touch-action:none;cursor:crosshair;-webkit-user-select:none;user-select:none;pointer-events:none}
 .dd-pick-hint{position:absolute;width:max-content;white-space:nowrap;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;max-width:calc(100vw - 24px);padding:6px 8px 6px 14px;border-radius:999px;background:var(--dd-bg);color:var(--dd-text);border:1px solid var(--dd-border);font-size:13px;line-height:1.3;box-shadow:0 4px 14px rgba(0,0,0,.3);pointer-events:none}
 .dd-pick-exit{all:unset;pointer-events:auto;box-sizing:border-box;min-width:28px;height:28px;border-radius:50%;text-align:center;line-height:28px;cursor:pointer;background:var(--dd-accent);color:#fff;font-size:13px}
 .dd-pick-upload{all:unset;pointer-events:auto;box-sizing:border-box;padding:6px 11px;border:1px solid var(--dd-accent);border-radius:999px;background:var(--dd-accent);color:#fff;font-size:12px;line-height:1.2;cursor:pointer;white-space:nowrap}
