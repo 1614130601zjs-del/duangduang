@@ -512,7 +512,7 @@ function ddBuildBar(overlay){
     if(d.jb==='power'){ddJellyCfg();c.jellyOn=!c.jellyOn;if(!c.jellyOn)S.selecting=false;ddSave();rebind();return;}
     if(d.jb==='more'){const p=$b('.dd-jb-panel');p.hidden=!p.hidden;paintBar();return;}
     if(d.jbImage==='erase'){if(!overlay._ddBgEraser){ddLastCutoutBlob=null;const release=$b('[data-jb-image="float"]');if(release)release.disabled=true;ddSetBgEraser(overlay,true);}return;}
-    if(d.jbImage==='float'){if(overlay._ddBgEraser){ddToast('请先完成或取消背景擦除');return;}const source=ddLastCutoutBlob?{blob:ddLastCutoutBlob}:{url:overlay._ddOriginalUrl||img?.currentSrc||img?.src};if(!source.blob&&!source.url){ddToast('没有可放出的图片');return;}window.dispatchEvent(new CustomEvent('duangduang:pet-release-image',{detail:source}));if(overlay.open)overlay.close();return;}
+    if(d.jbImage==='float'){if(overlay._ddBgEraser){ddToast('请先完成或取消背景擦除');return;}const source=ddLastCutoutBlob?{blob:ddLastCutoutBlob}:{url:overlay._ddOriginalUrl||img?.currentSrc||img?.src};if(!source.blob&&!source.url){ddToast('没有可放出的图片');return;}const result=await new Promise(resolve=>{let settled=false;const finish=value=>{if(settled)return;settled=true;clearTimeout(timer);resolve(value);};const timer=setTimeout(()=>finish({ok:false,message:'桌宠模块没有响应，请检查桌宠扩展是否正常加载'}),15000);window.dispatchEvent(new CustomEvent('duangduang:pet-release-image',{detail:{...source,onResult:finish}}));});if(!result?.ok){ddToast(result?.message||'桌宠放出失败');return;}if(overlay.open)overlay.close();return;}
     if(d.jb==='sel'){ddJellyCfg();if(!c.jellyOn){c.jellyOn=true;ddSave();}S.selecting=true;S.tool='add';rebind();return;}
     if(d.jbTool){S.tool=d.jbTool;paintBar();return;}
     if(d.jb==='done'){S.selecting=false;rebind();return;}
