@@ -512,7 +512,7 @@ function ddBuildBar(overlay){
     if(d.jb==='power'){ddJellyCfg();c.jellyOn=!c.jellyOn;if(!c.jellyOn)S.selecting=false;ddSave();rebind();return;}
     if(d.jb==='more'){const p=$b('.dd-jb-panel');p.hidden=!p.hidden;paintBar();return;}
     if(d.jbImage==='erase'){if(!overlay._ddBgEraser){ddLastCutoutBlob=null;const release=$b('[data-jb-image="float"]');if(release)release.disabled=true;ddSetBgEraser(overlay,true);}return;}
-    if(d.jbImage==='float'){if(!ddLastCutoutBlob){ddToast('请先擦除背景并点击完成');return;}window.dispatchEvent(new CustomEvent('duangduang:pet-release-image',{detail:{blob:ddLastCutoutBlob}}));return;}
+    if(d.jbImage==='float'){if(!ddLastCutoutBlob){ddToast('请先擦除背景并点击完成');return;}window.dispatchEvent(new CustomEvent('duangduang:pet-release-image',{detail:{blob:ddLastCutoutBlob}}));if(overlay.open)overlay.close();return;}
     if(d.jb==='sel'){ddJellyCfg();if(!c.jellyOn){c.jellyOn=true;ddSave();}S.selecting=true;S.tool='add';rebind();return;}
     if(d.jbTool){S.tool=d.jbTool;paintBar();return;}
     if(d.jb==='done'){S.selecting=false;rebind();return;}
@@ -711,7 +711,7 @@ function ddOpenViewer(url,sourceEl=null){
  ddSetBgEraser(dlg,false);ddApplyAutoFloat(dlg,false);
  if(dlg._ddCutoutUrl){URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl='';}
  dlg._ddCutoutReady=false;dlg._ddOriginalUrl=url;img.style.visibility='';img.src=url;
- const tools=dlg._ddBgTools;if(tools){tools.querySelector('.dd-bg-brushes').hidden=true;tools.querySelector('.dd-bg-edit-actions').hidden=true;tools.querySelector('.dd-bg-status').textContent='可先正常互动；需要时从扩展设置的「图片工具」启动背景擦除。'};
+ const tools=dlg._ddBgTools;if(tools){tools.querySelector('.dd-bg-brushes').hidden=true;tools.querySelector('.dd-bg-edit-actions').hidden=true;tools.querySelector('.dd-bg-status').textContent='可先正常互动；需要时打开下方「设置」并选择「擦除背景」。'};
  ddJellyClearSelection(img);{const p=dlg.querySelector('.dd-jb-panel');if(p)p.hidden=true;}dlg._ddMsg?.('');
  ddAttachJelly(img);dlg._ddPaintBar?.();
  dlg._ddOpenedAt=Date.now();
