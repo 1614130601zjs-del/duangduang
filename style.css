@@ -452,3 +452,128 @@ body>#lp-panel{--lp-panel:#fff;--lp-text:#171717;--lp-muted:#777;--lp-border:#de
 .lp-entry-option:active{background:#eee}
 .lp-entry-option>span{font-size:14px;font-weight:700}
 .lp-entry-option>small{font-size:11px;color:#888}
+
+
+/* DuangPet 风格：图片放大交互弹窗（仅视觉层，不改交互结构） */
+dialog.dd-viewer:not(.dd-auto-float){
+ box-sizing:border-box;
+ display:flex;
+ flex-direction:column;
+ gap:14px;
+ width:min(760px,calc(100vw - 20px));
+ max-width:calc(100vw - 20px);
+ max-height:calc(100dvh - max(28px,env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+ overflow:auto;
+ overscroll-behavior:contain;
+ padding:18px;
+ border:1px solid #e4e4e4;
+ border-radius:18px;
+ background:#fff;
+ color:#171717;
+ box-shadow:0 20px 70px #0003;
+}
+dialog.dd-viewer:not(.dd-auto-float)::before{
+ content:"Duang 果冻";
+ display:block;
+ padding:2px 42px 12px 2px;
+ border-bottom:1px solid #e8e8e8;
+ color:#111;
+ font-size:30px;
+ line-height:1.05;
+ font-weight:800;
+ letter-spacing:-1.2px;
+}
+dialog.dd-viewer:not(.dd-auto-float) .dd-close{
+ top:17px;
+ right:17px;
+ width:30px;
+ height:30px;
+ border:1px solid #ddd;
+ border-radius:50%;
+ background:#fff;
+ color:#222;
+}
+dialog.dd-viewer:not(.dd-auto-float) .dd-close svg{
+ stroke:#222;
+}
+dialog.dd-viewer:not(.dd-auto-float) .dd-stage{
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ min-width:0;
+ min-height:120px;
+ max-height:62dvh;
+ overflow:auto;
+ overscroll-behavior:contain;
+ border:1px solid #e4e4e4;
+ border-radius:14px;
+ background-color:#f7f7f7;
+ background-image:linear-gradient(45deg,#e8e8e8 25%,transparent 25%),linear-gradient(-45deg,#e8e8e8 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e8e8e8 75%),linear-gradient(-45deg,transparent 75%,#e8e8e8 75%);
+ background-size:18px 18px;
+ background-position:0 0,0 9px,9px -9px,-9px 0;
+}
+dialog.dd-viewer:not(.dd-auto-float) .dd-stage>img{
+ max-width:100%;
+ max-height:54dvh;
+ width:auto;
+ height:auto;
+ object-fit:contain;
+ border-radius:8px;
+ box-shadow:none;
+}
+dialog.dd-viewer:not(.dd-auto-float) .dd-bg-tools{
+ width:100%;
+ max-width:100%;
+ margin:0;
+ padding:0 2px;
+ color:#222;
+}
+dialog.dd-viewer:not(.dd-auto-float) .dd-bg-tools button{
+ border-color:#ddd;
+ background:#fff;
+ color:#222;
+}
+dialog.dd-viewer:not(.dd-auto-float) .dd-bg-tools .dd-bg-brushes{
+ border-color:#ddd;
+ background:#fff;
+}
+dialog.dd-viewer:not(.dd-auto-float) .dd-bg-tools .dd-bg-status{
+ color:#777;
+}
+dialog.dd-viewer:not(.dd-auto-float) .dd-jelly-bar{
+ position:relative;
+ top:auto;
+ left:auto;
+ transform:none;
+ width:max-content;
+ max-width:100%;
+ margin:0 auto;
+}
+dialog.dd-viewer:not(.dd-auto-float) .dd-jelly-bar .dd-jb-head,
+dialog.dd-viewer:not(.dd-auto-float) .dd-jelly-bar .dd-jb-panel{
+ border-color:#ddd;
+ background:#fff;
+ color:#222;
+ box-shadow:0 8px 24px #0000000d;
+}
+dialog.dd-viewer:not(.dd-auto-float) .dd-jelly-bar button{
+ border-color:#ddd;
+ color:#222;
+}
+dialog.dd-viewer:not(.dd-auto-float) .dd-jelly-bar button.is-active{
+ border-color:#222;
+ background:#222;
+ color:#fff;
+}
+@media(max-width:480px){
+ dialog.dd-viewer:not(.dd-auto-float){
+  width:calc(100vw - 16px);
+  max-width:calc(100vw - 16px);
+  max-height:calc(100dvh - max(20px,env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+  padding:13px;
+  gap:10px;
+ }
+ dialog.dd-viewer:not(.dd-auto-float)::before{font-size:27px;padding-bottom:10px}
+ dialog.dd-viewer:not(.dd-auto-float) .dd-stage{min-height:100px;max-height:58dvh}
+ dialog.dd-viewer:not(.dd-auto-float) .dd-stage>img{max-width:100%;max-height:48dvh}
+}
