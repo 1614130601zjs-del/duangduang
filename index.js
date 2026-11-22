@@ -829,7 +829,7 @@ function ddEnterPick(){
  const hl=root.querySelector('.dd-hl');
  root.querySelector('.dd-pick-upload').addEventListener('click',()=>{ddExitPick();window.dispatchEvent(new CustomEvent('duangduang:pet-upload-request'));});
  let raf=0,last=null,down=null;
- const ours=e=>!!(e.target&&e.target.closest&&e.target.closest('.dd-ball,.dd-viewer,.dd-toast,.dd-pick-upload,.dd-pick-exit'));
+ const ours=e=>!!(e.target&&e.target.closest&&e.target.closest('.dd-ball,.dd-viewer,.dd-toast,.dd-pick-upload'));
  const probe=e=>{last=e;if(raf)return;raf=requestAnimationFrame(()=>{raf=0;ddHighlight(ddFindAt(last.clientX,last.clientY));});};
  // 选图模式下，在 window 的捕获阶段把所有不属于拾取层、悬浮球和弹窗的点击 / 触摸全部拦下，
  // 这样即使别的元素盖在上面，酒馆原本的点击行为（比如点头像放大）也不会被触发。
