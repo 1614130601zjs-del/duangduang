@@ -563,7 +563,7 @@ async function ddSetBgEraser(dlg,enabled){
  if(!img.naturalWidth||!img.naturalHeight){ddToast('这张图片暂时无法编辑');return;}
  img._ddJellyAbort?.abort();
  const canvas=document.createElement('canvas');canvas.className='dd-bg-eraser-canvas';canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
- const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0);stage.append(canvas);img.style.visibility='hidden';
+ const ctx=canvas.getContext('2d');try{ctx.drawImage(img,0,0);}catch{ddToast('这张图片受跨域保护，无法进行背景擦除；可以换一张图片试试');return;}stage.append(canvas);img.style.visibility='hidden';
  const st={canvas,ctx,history:[],pointer:null};dlg._ddBgEraser=st;
  const point=e=>{const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)/Math.max(1,r.width)*canvas.width,y:(e.clientY-r.top)/Math.max(1,r.height)*canvas.height};};
  const stamp=p=>{const radius=Math.max(1,Math.min(canvas.width,canvas.height)*Number(panel.querySelector('[data-bg-size]').value||7)/200),softness=Number(panel.querySelector('[data-bg-soft]').value||65);ctx.save();ctx.globalCompositeOperation='destination-out';if(softness<=0){ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();}else{const inner=radius*(1-softness/100),g=ctx.createRadialGradient(p.x,p.y,inner,p.x,p.y,radius);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();}ctx.restore();};
