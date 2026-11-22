@@ -530,7 +530,7 @@ function ddBuildBar(overlay){
 }
 
 // ===== 放大弹窗 =====
-let ddPicking=false,ddPickUi=null;
+let ddPicking=false,ddPickUi=null,ddPetPickMode=false;
 function ddToast(text){
  let t=document.querySelector('.dd-toast');if(!t){t=document.createElement('div');t.className='dd-toast';t.setAttribute('role','status');document.body.append(t);}
  t.textContent=text;t.classList.add('is-on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('is-on'),2600);
@@ -812,12 +812,15 @@ async function ddHandleTap(x,y){
   ddToast('识别到图片，正在打开…');
   const url=await ddSourceOf(hit);
   if(!url){ddToast('这张图抓不到（可能被浏览器保护了）');return;}
-  ddShowPickUi(false);ddOpenViewer(url,hit.kind==='img'?hit.el:null);
+  ddShowPickUi(false);
+  if(ddPetPickMode){ddPetPickMode=false;ddExitPick();window.dispatchEvent(new CustomEvent('duangduang:pet-image-selected',{detail:{url}}));return;}
+  ddOpenViewer(url,hit.kind==='img'?hit.el:null);
  }catch(err){
   console.warn('[duangduang] 选图失败',err);
   ddToast('选图出错：'+((err&&err.message)||err));
  }
 }
+window.addEventListener('duangduang:pet-pick-start',()=>{ddPetPickMode=true;ddEnterPick();});
 function ddEnterPick(){
  if(ddPicking)return;
  ddPicking=true;document.querySelector('.dd-ball')?.classList.add('is-active');
@@ -856,7 +859,7 @@ function ddEnterPick(){
 }
 function ddPickKey(e){if(e.key==='Escape'&&ddPicking&&!document.querySelector('dialog.dd-viewer[open]')){e.stopPropagation();ddExitPick();}}
 function ddExitPick(){
- ddPicking=false;document.querySelector('.dd-ball')?.classList.remove('is-active');
+ ddPicking=false;ddPetPickMode=false;document.querySelector('.dd-ball')?.classList.remove('is-active');
  ddPickUi?.cleanup?.();ddPickUi?.root.remove();ddPickUi=null;document.removeEventListener('keydown',ddPickKey,true);
 }
 
@@ -1066,8 +1069,8 @@ function ddMountBall(){
    const c=ddCfg();c.ballX=toRight?1:0;c.ballY=Math.max(0,Math.min(1,r.top/Math.max(1,window.innerHeight-h)));ddSave();ddPlaceBall(ball);
   }else{
    const dlg=document.querySelector('dialog.dd-viewer[open]');
-   if(dlg){dlg.close();return;}   // 弹窗开着时点悬浮球：关掉弹窗，回到选图
-   ddPicking?ddExitPick():ddEnterPick();
+   if(dlg){dlg.close();return;}
+   window.dispatchEvent(new CustomEvent('duangduang:pet-chooser'));
   }
  };
  ball.addEventListener('pointerup',end);ball.addEventListener('pointercancel',end);
