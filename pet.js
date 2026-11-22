@@ -695,8 +695,14 @@ function mount(){
   const content=document.createElement('div');content.className='lp-float-content';f.append(content);document.body.append(f);petFloat=f;
   petRoot.style.transform='';petRoot.style.transformOrigin='';content.append(petRoot);
   requestAnimationFrame(()=>{
-   const contentRect=content.getBoundingClientRect();
-   const base={width:contentRect.width,height:contentRect.height,contentWidth:contentRect.width,contentHeight:contentRect.height,ratio:contentRect.width/Math.max(1,contentRect.height)};
+   // 桌宠移入 body 后，明确锁定浮窗与内容尺寸，避免 fixed 元素在移动端按 shrink-to-fit 收缩成零尺寸。
+   const rootRect=petRoot.getBoundingClientRect();
+   const width=Math.ceil(rootRect.width||petImage.getBoundingClientRect().width||petImage.naturalWidth);
+   const height=Math.ceil(rootRect.height||petImage.getBoundingClientRect().height||petImage.naturalHeight);
+   if(!width||!height){toast('图片尺寸尚未就绪，请重新载入图片');returnPetToEditor();return;}
+   content.style.width=width+'px';content.style.height=height+'px';
+   f.style.width=width+'px';f.style.height=height+'px';
+   const base={width,height,contentWidth:width,contentHeight:height,ratio:width/Math.max(1,height)};
    f._lpResizeBase=base;f._lpCurrentScale=1;
    if(petFloatState){
     const initialScale=clamp(petFloatState.scale||1,.01,Math.max(.01,Math.min((innerWidth-16)/base.width,(innerHeight-16)/base.height)));
