@@ -512,7 +512,7 @@ function ddBuildBar(overlay){
     if(d.jb==='power'){ddJellyCfg();c.jellyOn=!c.jellyOn;if(!c.jellyOn)S.selecting=false;ddSave();rebind();return;}
     if(d.jb==='more'){const p=$b('.dd-jb-panel');p.hidden=!p.hidden;paintBar();return;}
     if(d.jbImage==='erase'){if(!overlay._ddBgEraser){ddLastCutoutBlob=null;const release=$b('[data-jb-image="float"]');if(release)release.disabled=true;ddSetBgEraser(overlay,true);}return;}
-    if(d.jbImage==='float'){if(overlay._ddBgEraser){ddToast('请先完成或取消背景擦除');return;}const source=ddLastCutoutBlob?{blob:ddLastCutoutBlob}:{url:overlay._ddOriginalUrl||img?.currentSrc||img?.src};if(!source.blob&&!source.url){ddToast('没有可放出的图片');return;}const result=await new Promise(resolve=>{let settled=false;const finish=value=>{if(settled)return;settled=true;clearTimeout(timer);resolve(value);};const timer=setTimeout(()=>finish({ok:false,message:'桌宠模块没有响应，请检查桌宠扩展是否正常加载'}),15000);window.dispatchEvent(new CustomEvent('duangduang:pet-release-image',{detail:{...source,onResult:finish}}));});if(!result?.ok){ddToast(result?.message||'桌宠放出失败');return;}if(overlay.open)overlay.close();return;}
+    if(d.jbImage==='float'){if(overlay._ddBgEraser){ddToast('请先完成或取消背景擦除');return;}const source=ddLastCutoutBlob?{blob:ddLastCutoutBlob}:{url:overlay._ddOriginalUrl||img?.currentSrc||img?.src};if(!source.blob&&!source.url){ddToast('没有可放出的图片');return;}const result=await new Promise(resolve=>{let settled=false;const finish=value=>{if(settled)return;settled=true;clearTimeout(timer);resolve(value);};const timer=setTimeout(()=>finish({ok:false,message:'桌宠模块没有响应，请检查桌宠扩展是否正常加载'}),15000);window.dispatchEvent(new CustomEvent('duangduang:pet-release-image',{detail:{...source,mask:{mask:(S&&S.mask)?Array.from(S.mask):[],has:!!(S&&S.has)},cfg:ddInheritCfg(c),onResult:finish}}));});if(!result?.ok){ddToast(result?.message||'桌宠放出失败');return;}if(ddPicking)ddExitPick();if(overlay.open)overlay.close();return;}
     if(d.jb==='sel'){ddJellyCfg();if(!c.jellyOn){c.jellyOn=true;ddSave();}S.selecting=true;S.tool='add';rebind();return;}
     if(d.jbTool){S.tool=d.jbTool;paintBar();return;}
     if(d.jb==='done'){S.selecting=false;rebind();return;}
@@ -748,7 +748,7 @@ function ddFlatList(root,x,y,depth=0){
 function ddFindAt(x,y,doc=document,ox=0,oy=0,depth=0){
  const list=ddFlatList(doc,x,y);
  for(const el of list){
-  if(el.closest?.('.dd-pick,.dd-ball,.dd-viewer,.dd-hl,.dd-toast'))continue;
+  if(el.closest?.('.dd-pick,.dd-ball,.dd-viewer,.dd-hl,.dd-toast,#lp-float,#lp-panel'))continue;
   const tag=el.tagName;
   if(tag==='IFRAME'){
    if(depth>=4)continue;
@@ -828,10 +828,10 @@ function ddEnterPick(){
  ddPicking=true;document.querySelector('.dd-ball')?.classList.add('is-active');
  const root=document.createElement('div');root.className='dd-pick';
  root.innerHTML='<div class="dd-pick-hint"><span>点一张图片，把它放大来玩</span><button type="button" class="dd-pick-upload">上传图片</button><button type="button" class="dd-pick-exit" aria-label="退出选图">✕</button></div><div class="dd-hl"></div>';
- root.querySelector('.dd-pick-upload').addEventListener('click',()=>{ddExitPick();window.dispatchEvent(new CustomEvent('duangduang:pet-upload-request'));});
+ root.querySelector('.dd-pick-upload').addEventListener('click',()=>{ddPickLocalImage();ddExitPick();});
  const hl=root.querySelector('.dd-hl');
  let raf=0,last=null,down=null;
- const ours=e=>!!(e.target&&e.target.closest&&e.target.closest('.dd-ball,.dd-viewer,.dd-toast,.dd-pick-upload'));
+ const ours=e=>!!(e.target&&e.target.closest&&e.target.closest('.dd-ball,.dd-viewer,.dd-toast,.dd-pick-upload,.dd-tmp-file,#lp-float,#lp-panel'));
  const probe=e=>{last=e;if(raf)return;raf=requestAnimationFrame(()=>{raf=0;ddHighlight(ddFindAt(last.clientX,last.clientY));});};
  // 选图模式下，在 window 的捕获阶段把所有不属于拾取层、悬浮球和弹窗的点击 / 触摸全部拦下，
  // 这样即使别的元素盖在上面，酒馆原本的点击行为（比如点头像放大）也不会被触发。
@@ -867,6 +867,23 @@ function ddEnterPick(){
  ddToast('选图模式已开：点一张图片');
 }
 function ddPickKey(e){if(e.key==='Escape'&&ddPicking&&!document.querySelector('dialog.dd-viewer[open]')){e.stopPropagation();ddExitPick();}}
+// 选本地图片：必须在点击手势里同步 input.click()；输入框要留在页面里直到选完或取消，手机浏览器才会真的弹出相册。
+function ddPickLocalImage(){
+ document.querySelectorAll('input.dd-tmp-file').forEach(x=>x.remove());
+ const input=document.createElement('input');input.type='file';input.accept='image/*';input.className='dd-tmp-file';
+ input.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;';
+ input.addEventListener('change',()=>{
+  const f=input.files&&input.files[0];input.remove();if(!f)return;
+  const url=URL.createObjectURL(f);
+  window.dispatchEvent(new CustomEvent('duangduang:pet-image-selected',{detail:{url}}));
+  setTimeout(()=>URL.revokeObjectURL(url),120000);
+ });
+ input.addEventListener('cancel',()=>input.remove());
+ document.body.append(input);input.click();
+}
+// 放出桌宠时，把查看器里调好的果冻互动设置一起带过去（桌宠自己的设置存在另一个命名空间里）。
+const DD_INHERIT_KEYS=['jellyOn','jellyTap','jellyDrag','jellyShake','jellyStrength','jellyBrush','jellyBurst','jellyBurstN','jellyBurstMode','jellyBurstDecay','jellyBurstPower','autoMode','autoSec','autoPower'];
+function ddInheritCfg(c){const o={};for(const k of DD_INHERIT_KEYS)if(c[k]!==undefined)o[k]=c[k];o.autoOn=!!c.autoOn&&c.autoViewer!==false;return o;}
 function ddExitPick(){
  ddPicking=false;document.querySelector('.dd-ball')?.classList.remove('is-active');
  ddPickUi?.cleanup?.();ddPickUi?.root.remove();ddPickUi=null;document.removeEventListener('keydown',ddPickKey,true);

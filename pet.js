@@ -15,6 +15,9 @@ function ddCfg(){
  return c;
 }
 const ddSave=()=>{try{saveSettingsDebounced();}catch{}};
+// 桌宠音效：双击调出缩放/移动边框的那一下不响（否则会连着“啪啪”两声）。
+let petSoundMuteUntil=0;
+const ddPetSound=(kind,strength)=>{if(Date.now()<petSoundMuteUntil)return;window.DuangDuang?.playSound?.(kind,strength);};
 
 // ===== 放大图小互动（果冻）：范围（局部 / 抹开 / 全屏）× 选区（可选）× 交互（点击 / 拖动 / 摇晃） =====
 // 弹簧动画只在触摸 / 拖动 / 摇晃时跑，松手停稳后自动结束；选区只在放大图打开期间保留。
@@ -35,7 +38,7 @@ function ddJellyCfg(){
 function ddBurstCfg(){const c=ddCfg();return{mode:c.jellyBurstMode==='press'?'press':'wobble',n:Math.max(1,Math.min(10,Math.round(Number(c.jellyBurstN)||3))),decay:c.jellyBurstDecay!==false,power:Math.max(.2,Math.min(2,Number(c.jellyBurstPower)||1))};}
 function ddBurst(img,pt){
  const b=ddBurstCfg();let i=0;
- window.DuangDuang?.playSound?.('burst',b.power);
+ ddPetSound('burst',b.power);
  const go=()=>{
   if(!img.isConnected)return;
   const fac=b.decay?(b.n>1?1-i/b.n*.82:1):1,k=b.power*fac;
@@ -350,6 +353,7 @@ function ddAttachJelly(img){
    aff.t=[0,0,1,1,0];
   }
   kick();
+  if(!S.selecting&&!p.moved&&Date.now()-p.t<450&&!conf.burst)ddPetSound('tap');else if(p.moved&&conf.drag)ddPetSound('release');
   if(conf.burst&&!S.selecting&&!p.moved&&Date.now()-p.t<450)ddBurst(img,[cx,cy]);
  };
  img.addEventListener('pointerup',end,sig);img.addEventListener('pointercancel',end,sig);
@@ -442,6 +446,7 @@ function ddAttachJellyWhole(img,conf){
   if(!drag||(e&&e.pointerId!==drag.id))return;
   const d=drag;drag=null;try{img.releasePointerCapture(d.id);}catch{}
   const quick=Date.now()-d.t<450&&!d.moved;
+  if(quick&&!conf.burst)ddPetSound('tap');else if(d.moved&&conf.drag)ddPetSound('release');
   if(quick&&conf.tap){squish();return;}
   if(d.moved&&conf.drag){
    // 松手：保留当前拉伸状态，并给一点反向速度，弹簧会带来 Q 弹的过冲。
@@ -542,7 +547,16 @@ let petUrl='',petRoot=null,petImage=null,petFloat=null,petFloatState=null,petBlo
 function saveCfg(){try{saveSettingsDebounced();}catch{}}
 function toast(t){const el=document.querySelector('#lp-toast');if(!el)return;el.textContent=t;el.classList.add('is-visible');clearTimeout(el._timer);el._timer=setTimeout(()=>el.classList.remove('is-visible'),2100);}
 function detachPet(){if(petImage)petImage._ddJellyAbort?.abort();if(petFloat)petFloat.remove();petFloat=null;petFloatState=null;petRoot?.remove();petRoot=null;petImage=null;}
-function restoreMask(img){return dbGet('pet-mask').then(saved=>{const S=ddJellyState(img);if(saved&&Array.isArray(saved.mask)&&saved.mask.length===S.mask.length){S.mask.set(saved.mask);S.has=!!saved.has;}else{S.mask.fill(0);S.has=false;}ddAttachJelly(img);});}
+// 从查看器放出时带过来的选区：优先于上一次保存的旧选区。
+let petMaskOverride=null;
+const PET_INHERIT_KEYS=['jellyOn','jellyTap','jellyDrag','jellyShake','jellyStrength','jellyBrush','jellyBurst','jellyBurstN','jellyBurstMode','jellyBurstDecay','jellyBurstPower','autoOn','autoMode','autoSec','autoPower'];
+function ddInheritFromViewer(detail){
+ const cfg=detail?.cfg;
+ if(cfg&&typeof cfg==='object'){const c=ddCfg();for(const k of PET_INHERIT_KEYS)if(cfg[k]!==undefined)c[k]=cfg[k];if(c.jellyShake&&!c.jellyOn)c.jellyOn=true;saveCfg();}
+ const m=detail?.mask;
+ petMaskOverride=(m&&Array.isArray(m.mask))?{mask:m.mask,has:!!m.has}:null;
+}
+function restoreMask(img){const override=petMaskOverride;petMaskOverride=null;return (override?Promise.resolve(override):dbGet('pet-mask')).then(saved=>{const S=ddJellyState(img);if(saved&&Array.isArray(saved.mask)&&saved.mask.length===S.mask.length){S.mask.set(saved.mask);S.has=!!saved.has;}else{S.mask.fill(0);S.has=false;}if(override)ddPersistMask(img,S);ddAttachJelly(img);});}
 function makePetRoot(){const root=document.createElement('div');root.className='lp-interaction';root.innerHTML='<div class="lp-image-host"><img alt="小小桌宠" draggable="false"></div>';const img=root.querySelector('img');return {root,img};}
 async function setPetImage(source){
  if(!source)return;if(petEraser)await ddSetEraser(false);detachPet();
@@ -722,7 +736,7 @@ function mount(){
    const showFrame=()=>{f.classList.add('is-framed');keepFrame();};
    f._lpKeepFrame=keepFrame;
    f.addEventListener('pointerdown',e=>{if(e.target.closest('.lp-image-host'))tapStart={x:e.clientX,y:e.clientY,t:Date.now(),id:e.pointerId};else tapStart=null;if(f.classList.contains('is-framed'))keepFrame();},true);
-   f.addEventListener('pointerup',e=>{const q=tapStart;tapStart=null;if(!q||q.id!==e.pointerId)return;if(Date.now()-q.t<450&&Math.hypot(e.clientX-q.x,e.clientY-q.y)<8){const now=Date.now(),l=lastTap;if(l&&now-l.t<420&&Math.hypot(e.clientX-l.x,e.clientY-l.y)<40){lastTap=null;showFrame();}else lastTap={t:now,x:e.clientX,y:e.clientY};}},true);
+   f.addEventListener('pointerup',e=>{const q=tapStart;tapStart=null;if(!q||q.id!==e.pointerId)return;if(Date.now()-q.t<450&&Math.hypot(e.clientX-q.x,e.clientY-q.y)<8){const now=Date.now(),l=lastTap;if(l&&now-l.t<420&&Math.hypot(e.clientX-l.x,e.clientY-l.y)<40){lastTap=null;petSoundMuteUntil=Date.now()+150;showFrame();}else lastTap={t:now,x:e.clientX,y:e.clientY};}},true);
    f.addEventListener('pointercancel',()=>{tapStart=null;},true);
    const outsideHide=e=>{if(!f.isConnected){document.removeEventListener('pointerdown',outsideHide,true);return;}if(!f.contains(e.target))hideFrame();};
    document.addEventListener('pointerdown',outsideHide,true);
@@ -753,7 +767,7 @@ function mount(){
   });
   close();
  });
- window.addEventListener('duangduang:pet-release-image',async e=>{const blob=e.detail?.blob,url=e.detail?.url,respond=e.detail?.onResult;if(!blob&&!url){respond?.({ok:false,message:'没有收到图片'});return;}try{let source=blob;if(!source&&url){try{const response=await fetch(url);if(response.ok)source=await response.blob();else throw new Error('图片读取失败（HTTP '+response.status+'）');}catch(err){if(err instanceof TypeError)source=url;else throw err;}source=source||url;}await setPetImage(source);petExternalMode=true;await setTab('editor');panel.querySelector('#lp-release').click();if(!petFloat)throw new Error('桌宠图片已载入，但悬浮窗口未创建');respond?.({ok:true});}catch(err){petExternalMode=false;respond?.({ok:false,message:err.message||'桌宠放出失败'});window.dispatchEvent(new CustomEvent('duangduang:pet-release-failed',{detail:{message:err.message||'桌宠放出失败'}}));toast(err.message||'桌宠放出失败');}});
+ window.addEventListener('duangduang:pet-release-image',async e=>{const blob=e.detail?.blob,url=e.detail?.url,respond=e.detail?.onResult;if(!blob&&!url){respond?.({ok:false,message:'没有收到图片'});return;}try{let source=blob;if(!source&&url){try{const response=await fetch(url);if(response.ok)source=await response.blob();else throw new Error('图片读取失败（HTTP '+response.status+'）');}catch(err){if(err instanceof TypeError)source=url;else throw err;}source=source||url;}ddInheritFromViewer(e.detail);await setPetImage(source);petExternalMode=true;await setTab('editor');panel.querySelector('#lp-release').click();if(!petFloat)throw new Error('桌宠图片已载入，但悬浮窗口未创建');ddAutoStart();respond?.({ok:true});}catch(err){petExternalMode=false;respond?.({ok:false,message:err.message||'桌宠放出失败'});window.dispatchEvent(new CustomEvent('duangduang:pet-release-failed',{detail:{message:err.message||'桌宠放出失败'}}));toast(err.message||'桌宠放出失败');}});
  panel.querySelector('#lp-reset').addEventListener('click',()=>{if(!petImage)return;petImage._ddJellyAbort?.abort();ddJellyClearSelection(petImage);ddPersistMask(petImage,ddJellyState(petImage));ddAttachJelly(petImage);petImage._ddJellyPrepare?.();toast('互动状态已复位');});
  panel.querySelector('#lp-remove-image').addEventListener('click',async()=>{if(petEraser)await ddSetEraser(false);detachPet();petBlob=null;petEraserHistory=[];await dbDelete('pet-image');await dbDelete('pet-mask');const stage=panel.querySelector('#lp-stage');let empty=stage.querySelector('#lp-empty');if(!empty){empty=document.createElement('div');empty.id='lp-empty';empty.className='lp-empty';empty.innerHTML='<b>放一张图片进来</b><small>支持 PNG、WebP、JPG，建议透明背景立绘</small><button id="lp-upload" type="button">选择图片</button>';empty.querySelector('#lp-upload').addEventListener('click',()=>fileInput.click());}stage.replaceChildren(empty);empty.hidden=false;panel.querySelector('#lp-jelly-slot').replaceChildren();toast('图片已移除');});
  // 编辑器入口由酒馆魔法棒菜单提供；不再创建悬浮球。
