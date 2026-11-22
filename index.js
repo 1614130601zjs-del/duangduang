@@ -611,6 +611,7 @@ function ddApplyAutoFloat(dlg,enabled){
  if(!dlg)return;
  if(!enabled){
   const state=dlg._ddFloatState;if(!state)return;
+   if(state.sourceEl?.isConnected)state.sourceEl.style.visibility=state.sourceVisibility;
   state.stage.style.transform='';state.stage.style.transformOrigin='';
   state.stage.style.position='';state.stage.style.left='';state.stage.style.top='';
   dlg.append(state.stage);if(state.bar)dlg.append(state.bar);
@@ -629,7 +630,9 @@ function ddApplyAutoFloat(dlg,enabled){
  back.addEventListener('pointerdown',e=>e.stopPropagation());
  back.addEventListener('click',()=>ddApplyAutoFloat(dlg,false));
  shell.append(move,back);
- const state={shell,stage,bar,scale:.62,left:0,top:0,baseW:0,baseH:0};
+ const sourceEl=dlg._ddSourceElement;
+  const state={shell,stage,bar,sourceEl,sourceVisibility:sourceEl?.style?.visibility??'',scale:.62,left:0,top:0,baseW:0,baseH:0};
+  if(sourceEl?.isConnected&&sourceEl.tagName==='IMG')sourceEl.style.visibility='hidden';
  dlg._ddFloatState=state;dlg._ddFloatingImg=stage.querySelector('img');
  shell.append(stage);if(bar)shell.append(bar);document.body.append(shell);
  if(dlg.open)dlg.close();
@@ -703,6 +706,7 @@ function ddOpenViewer(url,sourceEl=null){
   document.body.append(dlg);
  }
  const img=dlg.querySelector('img');
+ dlg._ddSourceElement=sourceEl;
  ddSetBgEraser(dlg,false);ddApplyAutoFloat(dlg,false);
  if(dlg._ddCutoutUrl){URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl='';}
  dlg._ddCutoutReady=false;dlg._ddOriginalUrl=url;img.style.visibility='';img.src=url;
