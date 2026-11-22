@@ -159,3 +159,5 @@ dialog.dd-viewer.dd-auto-float .dd-stage>img{max-width:min(42vw,280px);max-heigh
 dialog.dd-viewer.dd-auto-float .dd-auto-float-handle{position:absolute;left:50%;top:-30px;transform:translateX(-50%);padding:5px 13px;border:1px solid var(--dd-border);border-radius:999px;background:var(--dd-bg);color:var(--dd-text);font:inherit;font-size:11px;line-height:1.2;white-space:nowrap;touch-action:none;cursor:grab;box-shadow:0 3px 12px #0003}
 dialog.dd-viewer.dd-auto-float .dd-close{position:fixed;top:10px;right:10px;z-index:20}
 dialog.dd-viewer.dd-auto-float .dd-jelly-bar{position:fixed;left:50%;top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);transform:translateX(-50%);margin:0;max-width:calc(100vw - 16px)}
+
+dialog.dd-viewer.dd-auto-float::backdrop{background:transparent;backdrop-filter:none}
