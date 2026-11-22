@@ -537,7 +537,7 @@ function ddToast(text){
 }
 function ddBuildBgTools(dlg){
  const panel=document.createElement('div');panel.className='dd-bg-tools';
- panel.innerHTML='<div class="dd-bg-actions"><button type="button" data-bg-action="erase">擦除背景</button><button type="button" data-bg-action="float" disabled>放出悬浮主体</button><button type="button" data-bg-action="restore" hidden>恢复原图</button><button type="button" data-bg-action="return" hidden>返回大图</button></div><div class="dd-bg-brushes" hidden><label>笔刷大小 <input type="range" min="1" max="20" value="7" data-bg-size><output data-bg-size-value>7%</output></label><label>软度 <input type="range" min="0" max="100" value="65" data-bg-soft><output data-bg-soft-value>65%</output></label></div><div class="dd-bg-edit-actions" hidden><button type="button" data-bg-action="undo" disabled>撤销</button><button type="button" data-bg-action="cancel">取消</button><button type="button" data-bg-action="done">完成</button></div><small class="dd-bg-status" role="status">可先正常互动；需要时再手动擦除背景。</small>';
+ panel.innerHTML='<div class="dd-bg-actions"><button type="button" data-bg-action="erase">擦除背景</button><button type="button" data-bg-action="float" disabled>放出桌宠</button><button type="button" data-bg-action="restore" hidden>恢复原图</button><button type="button" data-bg-action="return" hidden>返回大图</button></div><div class="dd-bg-brushes" hidden><label>笔刷大小 <input type="range" min="1" max="20" value="7" data-bg-size><output data-bg-size-value>7%</output></label><label>软度 <input type="range" min="0" max="100" value="65" data-bg-soft><output data-bg-soft-value>65%</output></label></div><div class="dd-bg-edit-actions" hidden><button type="button" data-bg-action="undo" disabled>撤销</button><button type="button" data-bg-action="cancel">取消</button><button type="button" data-bg-action="done">完成</button></div><small class="dd-bg-status" role="status">可先正常互动；需要时再手动擦除背景。</small>';
  const q=s=>panel.querySelector(s);
  const sync=()=>{q('[data-bg-action="float"]').disabled=!dlg._ddCutoutReady;q('[data-bg-action="restore"]').hidden=!dlg._ddCutoutReady;q('[data-bg-action="return"]').hidden=!dlg._ddFloatState;};
  panel.addEventListener('input',e=>{if(e.target.matches('[data-bg-size]'))q('[data-bg-size-value]').textContent=e.target.value+'%';if(e.target.matches('[data-bg-soft]'))q('[data-bg-soft-value]').textContent=e.target.value+'%';});
@@ -548,7 +548,7 @@ function ddBuildBgTools(dlg){
   if(action==='undo'){const st=dlg._ddBgEraser;if(st?.history.length){const blob=st.history.pop(),bitmap=await createImageBitmap(blob);st.ctx.clearRect(0,0,st.canvas.width,st.canvas.height);st.ctx.drawImage(bitmap,0,0);bitmap.close?.();q('[data-bg-action="undo"]').disabled=!st.history.length;}return;}
   if(action==='cancel'){ddSetBgEraser(dlg,false);q('.dd-bg-edit-actions').hidden=true;q('.dd-bg-status').textContent='已取消擦除，原图保持不变。';return;}
   if(action==='done'){await ddFinishBgEraser(dlg);q('.dd-bg-edit-actions').hidden=true;sync();return;}
-  if(action==='float'){if(!dlg._ddCutoutReady)return;ddApplyAutoFloat(dlg,true);sync();q('.dd-bg-status').textContent='主体已放出；拖动上方把手调整位置，戳击和自动 duang 仍可使用。';return;}
+  if(action==='float'){if(!dlg._ddCutoutReady)return;const blob=await ddFinishBgEraser(dlg);if(!blob)return;window.dispatchEvent(new CustomEvent('duangduang:pet-release-image',{detail:{blob}}));if(dlg.open)dlg.close();return;}
   if(action==='return'){ddApplyAutoFloat(dlg,false);sync();q('.dd-bg-status').textContent='已返回大图互动。';return;}
   if(action==='restore'){ddApplyAutoFloat(dlg,false);if(dlg._ddCutoutUrl){URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl='';}dlg._ddCutoutReady=false;const im=dlg.querySelector('img');im.src=dlg._ddOriginalUrl||im.src;im.style.visibility='';ddAttachJelly(im);sync();q('.dd-bg-status').textContent='已恢复原图，擦除结果不会覆盖原图。';}
  });
@@ -606,7 +606,8 @@ async function ddFinishBgEraser(dlg){
  const url=URL.createObjectURL(blob);if(dlg._ddCutoutUrl)URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl=url;dlg._ddCutoutReady=true;st.canvas.remove();dlg._ddBgEraser=null;img.style.visibility='';img.src=url;
  await new Promise(resolve=>{if(img.complete)resolve();else{img.onload=resolve;img.onerror=resolve;}});
  dlg._ddBgTools.querySelector('.dd-bg-brushes').hidden=true;dlg._ddBgTools.querySelector('.dd-bg-edit-actions').hidden=true;ddAttachJelly(img);
- dlg._ddBgTools.querySelector('.dd-bg-status').textContent='背景擦除完成。原图已保留，可随时恢复；现在可以放出悬浮主体。';
+ dlg._ddBgTools.querySelector('.dd-bg-status').textContent='背景擦除完成。原图已保留，可随时恢复；现在可以放出桌宠。';
+ return blob;
 }
 function ddApplyAutoFloat(dlg,enabled){
  if(!dlg)return;
@@ -703,7 +704,7 @@ function ddOpenViewer(url,sourceEl=null){
    // 手指抬起后系统会补发一个 click，落在刚打开的弹窗上，会被当成点了背景而立刻关掉；打开后短时间内忽略点背景。
    if(e.target===dlg&&Date.now()-(dlg._ddOpenedAt||0)<600)return;
    if((e.target===dlg&&!dlg.classList.contains('dd-auto-float'))||e.target.closest('.dd-close')){if(dlg.open)dlg.close();else dlg.removeAttribute('open');}});
-  dlg.addEventListener('close',()=>{if(dlg._ddFloatState){ddBallBack();return;}ddSetBgEraser(dlg,false);ddBallBack();const im=dlg.querySelector('img');im?._ddJellyAbort?.abort();im?.removeAttribute('src');if(dlg._ddCutoutUrl){URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl='';}dlg._ddCutoutReady=false;ddOnViewerClosed();});
+  dlg.addEventListener('close',()=>{if(dlg._ddFloatState){ddBallBack();return;}ddSetBgEraser(dlg,false);ddBallBack();const im=dlg.querySelector('img');im?._ddJellyAbort?.abort();im?.removeAttribute('src');if(dlg._ddCutoutUrl){URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl='';}if(dlg._ddReturnedUrl){URL.revokeObjectURL(dlg._ddReturnedUrl);dlg._ddReturnedUrl='';}dlg._ddCutoutReady=false;ddOnViewerClosed();});
   document.body.append(dlg);
  }
  const img=dlg.querySelector('img');
@@ -723,6 +724,8 @@ function ddOpenViewer(url,sourceEl=null){
 function ddBallInto(dlg){const b=document.querySelector('.dd-ball');if(b&&b.parentElement!==dlg)dlg.append(b);}
 function ddBallBack(){const b=document.querySelector('.dd-ball');if(b&&b.parentElement!==document.body)document.body.append(b);}
 function ddOnViewerClosed(){if(ddPicking)ddShowPickUi(true);}
+window.addEventListener('duangduang:pet-float-returned',e=>{const blob=e.detail?.blob;if(!blob)return;const dlg=document.querySelector('dialog.dd-viewer');const source=dlg?._ddSourceElement||null;const url=URL.createObjectURL(blob);ddOpenViewer(url,source);const current=document.querySelector('dialog.dd-viewer');if(current)current._ddReturnedUrl=url;});
+window.addEventListener('duangduang:pet-release-failed',e=>ddToast(e.detail?.message||'桌宠放出失败'));
 
 // ===== 取图：从页面上点中的元素里拿到可以显示的地址 =====
 function ddBgUrl(el){
