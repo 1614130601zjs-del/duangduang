@@ -2,6 +2,7 @@
 // 点悬浮球进入选图模式，点任意一张图（普通图 / canvas / 背景图 / 同源 iframe 里的图），会把它复制一份到自己的弹窗里玩，不改动原图，也不会被别的插件重绘冲掉。
 import { extension_settings } from '/scripts/extensions.js';
 import { saveSettingsDebounced, getRequestHeaders } from '/script.js';
+import './pet.js';
 
 const EXT='duangduang';
 const defaults={ballOn:true,ballX:1,ballY:.62,ballShake:true,ballIcon:'default',ballIconPicked:false,ballFixed:26,ballCustoms:[],ballSize:56,jellyOn:true,jellyScope:'local',jellyTap:false,jellyDrag:true,jellyShake:false,jellyStrength:'mid',jellyBrush:.075,jellyBurst:false,jellyBurstN:3,jellyBurstMode:'wobble',jellyBurstDecay:true,jellyBurstPower:1,sfxOn:false,sfxVolume:.45,autoOn:false,autoMode:'interval',autoSec:8,autoPower:1,autoBall:true,autoViewer:true};
