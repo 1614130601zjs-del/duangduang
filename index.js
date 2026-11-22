@@ -21,7 +21,7 @@ const ddSave=()=>{try{saveSettingsDebounced();}catch{}};
 
 // ===== 果冻互动音效：程序化合成带掌面厚度的巴掌声 =====
 let ddAudioCtx=null;
-const DD_SLAP_URL='https://cdn.jsdelivr.net/gh/1614130601zjs-del/duangduang@feature/tap-sfx/assets/slap.mp3';
+const DD_SLAP_URL='https://cdn.jsdelivr.net/gh/1614130601zjs-del/duangduang@main/assets/slap.mp3';
 let ddSlapAudio=null;
 function ddPlaySound(kind='tap',strength=1){
  const c=ddCfg();if(!c.sfxOn)return;
