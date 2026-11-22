@@ -850,17 +850,8 @@ function ddEnterPick(){
   ddHandleTap(e.clientX,e.clientY);
  };
  const onOther=e=>{block(e);};
- const evs=[];
- // 现代移动端优先只走 Pointer Events。混合拦截 touchstart/touchend 会打断部分 WebView 的 pointer 序列，
- // 导致 pointerup 永远到不了，图片点击自然无法完成。
- if(typeof window.PointerEvent==='function'){
-  evs.push(['pointermove',onMove,{capture:true}],['pointerdown',onDown,{capture:true}],['pointerup',onUp,{capture:true}],['pointercancel',()=>{down=null;},{capture:true}]);
- }else{
-  const onTouchStart=e=>{if(ours(e))return;const t=e.changedTouches?.[0];if(!t)return;down={x:t.clientX,y:t.clientY,exit:!!(e.target.closest&&e.target.closest('.dd-pick-exit'))};if(!down.exit)probe(t);e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();};
-  const onTouchEnd=e=>{if(ours(e))return;const t=e.changedTouches?.[0],d=down;down=null;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();if(!t||!d)return;if(Math.hypot(t.clientX-d.x,t.clientY-d.y)>14)return;if(d.exit){ddExitPick();return;}ddHandleTap(t.clientX,t.clientY);};
-  evs.push(['touchstart',onTouchStart,{capture:true,passive:false}],['touchend',onTouchEnd,{capture:true,passive:false}],['touchcancel',()=>{down=null;},{capture:true}],['mousedown',onDown,{capture:true}],['mouseup',onUp,{capture:true}]);
- }
- for(const n of ['click','dblclick','auxclick','contextmenu'])evs.push([n,onOther,{capture:true,passive:false}]);
+ const evs=[['pointermove',onMove,{capture:true}],['pointerdown',onDown,{capture:true}],['pointerup',onUp,{capture:true}]];
+ for(const n of ['mousedown','mouseup','click','dblclick','auxclick','contextmenu','touchstart','touchend'])evs.push([n,onOther,{capture:true,passive:false}]);
  for(const [n,f,o] of evs)window.addEventListener(n,f,o);
  ddPickUi={root,hl,cleanup:()=>{for(const [n,f,o] of evs)window.removeEventListener(n,f,o);cancelAnimationFrame(raf);}};
  document.body.append(root);
