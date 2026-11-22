@@ -789,6 +789,8 @@ function ddShowPickUi(on){
  if(!ddPickUi)return;
  ddPickUi.root.style.display=on?'block':'none';
  if(!on)ddPickUi.hl.style.display='none';
+ // 只有真正处于选图界面时才拦截页面事件；查看器打开期间完全放行。
+ ddPickUi.setCapture?.(!!on);
 }
 function ddHighlight(hit){
  const hl=ddPickUi?.hl;if(!hl)return;
@@ -852,8 +854,14 @@ function ddEnterPick(){
  const onOther=e=>{block(e);};
  const evs=[['pointermove',onMove,{capture:true}],['pointerdown',onDown,{capture:true}],['pointerup',onUp,{capture:true}]];
  for(const n of ['mousedown','mouseup','click','dblclick','auxclick','contextmenu','touchstart','touchend'])evs.push([n,onOther,{capture:true,passive:false}]);
- for(const [n,f,o] of evs)window.addEventListener(n,f,o);
- ddPickUi={root,hl,cleanup:()=>{for(const [n,f,o] of evs)window.removeEventListener(n,f,o);cancelAnimationFrame(raf);}};
+ let captureOn=false;
+ const setCapture=on=>{
+  if(captureOn===on)return;
+  captureOn=on;
+  for(const [n,fn,o] of evs){if(on)window.addEventListener(n,fn,o);else window.removeEventListener(n,fn,o);}
+ };
+ setCapture(true);
+ ddPickUi={root,hl,setCapture,cleanup:()=>{setCapture(false);cancelAnimationFrame(raf);}};
  document.body.append(root);
  document.addEventListener('keydown',ddPickKey,true);
  ddToast('选图模式已开：点一张图片');
