@@ -24,7 +24,7 @@ const DD_SLAP_URL='https://cdn.jsdelivr.net/gh/1614130601zjs-del/duangduang@feat
 let ddSlapAudio=null;
 function ddPlaySound(kind='tap',strength=1){
  const c=ddCfg();if(!c.sfxOn)return;
- if(kind==='burst'){
+ if(kind==='burst'||kind==='release'){
   try{
    if(!ddSlapAudio){ddSlapAudio=new Audio(DD_SLAP_URL);ddSlapAudio.preload='auto';}
    const a=ddSlapAudio;
