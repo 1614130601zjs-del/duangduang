@@ -688,7 +688,7 @@ function ddApplyAutoFloat(dlg,enabled){
   dlg._ddPaintBar?.();
  });
 }
-function ddOpenViewer(url){
+function ddOpenViewer(url,sourceEl=null){
  let dlg=document.querySelector('dialog.dd-viewer');
  if(!dlg){
   dlg=document.createElement('dialog');dlg.className='dd-viewer';dlg.setAttribute('aria-label','果冻放大图');
@@ -807,7 +807,7 @@ async function ddHandleTap(x,y){
   ddToast('识别到图片，正在打开…');
   const url=await ddSourceOf(hit);
   if(!url){ddToast('这张图抓不到（可能被浏览器保护了）');return;}
-  ddShowPickUi(false);ddOpenViewer(url);
+  ddShowPickUi(false);ddOpenViewer(url,hit.kind==='img'?hit.el:null);
  }catch(err){
   console.warn('[duangduang] 选图失败',err);
   ddToast('选图出错：'+((err&&err.message)||err));
