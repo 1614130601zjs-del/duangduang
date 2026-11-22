@@ -570,7 +570,7 @@ function ddOpenViewer(url){
   dlg.addEventListener('click',e=>{
    // 手指抬起后系统会补发一个 click，落在刚打开的弹窗上，会被当成点了背景而立刻关掉；打开后短时间内忽略点背景。
    if(e.target===dlg&&Date.now()-(dlg._ddOpenedAt||0)<600)return;
-   if(e.target===dlg||e.target.closest('.dd-close')){if(dlg.open)dlg.close();else dlg.removeAttribute('open');}});
+   if((e.target===dlg&&!dlg.classList.contains('dd-auto-float'))||e.target.closest('.dd-close')){if(dlg.open)dlg.close();else dlg.removeAttribute('open');}});
   dlg.addEventListener('close',()=>{ddApplyAutoFloat(dlg,false);ddBallBack();dlg.querySelector('img')?.removeAttribute('src');dlg.querySelector('img')?._ddJellyAbort?.abort();ddOnViewerClosed();});
   document.body.append(dlg);
  }
@@ -581,7 +581,7 @@ function ddOpenViewer(url){
  dlg._ddOpenedAt=Date.now();
  ddBallInto(dlg);
  if(!dlg.open){if(typeof dlg.showModal==='function')dlg.showModal();else{dlg.setAttribute('open','');dlg.style.position='fixed';}}
- ddApplyAutoFloat(dlg,ddCfg().autoFloat!==false&&ddCfg().autoViewer!==false);
+ ddApplyAutoFloat(dlg,ddCfg().autoOn===true&&ddCfg().autoFloat!==false&&ddCfg().autoViewer!==false);
 }
 // 模态弹窗会把页面其他内容压在下面，悬浮球就看不见了；弹窗打开期间把球临时搬进弹窗里，关闭后搬回 body。
 function ddBallInto(dlg){const b=document.querySelector('.dd-ball');if(b&&b.parentElement!==dlg)dlg.append(b);}
@@ -985,7 +985,7 @@ function ddMountSettings(){
   [mode,n,pw,dc].forEach(el=>el.addEventListener('input',set));paint();}
  {const q=id=>box.querySelector(id),on=q('#dd-auto-on'),mode=q('#dd-auto-mode'),sec=q('#dd-auto-sec'),pw=q('#dd-auto-power'),ab=q('#dd-auto-ball'),av=q('#dd-auto-viewer'),af=q('#dd-auto-float'),b=q('#dd-auto-box'),row=q('#dd-auto-sec-row');
   const paint=()=>{const c=ddCfg();on.checked=!!c.autoOn;mode.value=['interval','random','always'].includes(c.autoMode)?c.autoMode:'interval';sec.value=c.autoSec;pw.value=Math.round(c.autoPower*100);ab.checked=c.autoBall!==false;av.checked=c.autoViewer!==false;af.checked=c.autoFloat!==false;q('#dd-auto-sec-v').textContent=c.autoSec+' 秒'+(c.autoMode==='random'?'起（随机到 2 倍）':'');q('#dd-auto-power-v').textContent=Math.round(c.autoPower*100)+'%';b.style.display=c.autoOn?'':'none';row.style.display=c.autoMode==='always'?'none':'';};
-  const set=()=>{const c=ddCfg();c.autoOn=on.checked;c.autoMode=mode.value;c.autoSec=Number(sec.value);c.autoPower=Number(pw.value)/100;c.autoBall=ab.checked;c.autoViewer=av.checked;c.autoFloat=af.checked;ddSave();paint();ddAutoStart();const dlg=document.querySelector('dialog.dd-viewer[open]');if(dlg)ddApplyAutoFloat(dlg,c.autoFloat&&c.autoViewer);};
+  const set=()=>{const c=ddCfg();c.autoOn=on.checked;c.autoMode=mode.value;c.autoSec=Number(sec.value);c.autoPower=Number(pw.value)/100;c.autoBall=ab.checked;c.autoViewer=av.checked;c.autoFloat=af.checked;ddSave();paint();ddAutoStart();const dlg=document.querySelector('dialog.dd-viewer[open]');if(dlg)ddApplyAutoFloat(dlg,c.autoOn&&c.autoFloat&&c.autoViewer);};
   [on,mode,sec,pw,ab,av,af].forEach(el=>el.addEventListener('input',set));paint();}
  {const so=box.querySelector('#dd-sfx-on'),sv=box.querySelector('#dd-sfx-volume'),vv=box.querySelector('#dd-sfx-volume-v');
   const paint=()=>{const k=ddCfg();so.checked=!!k.sfxOn;sv.value=String(Math.round(Math.max(0,Math.min(1,Number(k.sfxVolume)||0))*100));vv.textContent=sv.value+'%';};
