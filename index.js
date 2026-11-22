@@ -827,6 +827,7 @@ function ddEnterPick(){
  const root=document.createElement('div');root.className='dd-pick';
  root.innerHTML='<div class="dd-pick-hint"><span>点一张图片，把它放大来玩</span><button type="button" class="dd-pick-upload">上传图片</button><button type="button" class="dd-pick-exit" aria-label="退出选图">✕</button></div><div class="dd-hl"></div>';
  const hl=root.querySelector('.dd-hl');
+ root.querySelector('.dd-pick-upload').addEventListener('click',()=>{ddExitPick();window.dispatchEvent(new CustomEvent('duangduang:pet-upload-request'));});
  let raf=0,last=null,down=null;
  const ours=e=>!!(e.target&&e.target.closest&&e.target.closest('.dd-ball,.dd-viewer,.dd-toast,.dd-pick-upload,.dd-pick-exit'));
  const probe=e=>{last=e;if(raf)return;raf=requestAnimationFrame(()=>{raf=0;ddHighlight(ddFindAt(last.clientX,last.clientY));});};
