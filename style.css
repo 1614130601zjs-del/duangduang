@@ -170,7 +170,7 @@ dialog.dd-viewer .dd-bg-eraser-canvas{position:absolute;inset:auto;box-sizing:bo
 dialog.dd-viewer .dd-bg-tools{display:flex;flex-direction:column;gap:7px;margin:9px auto 0;max-width:min(520px,calc(100vw - 24px));font-size:12px}
 dialog.dd-viewer .dd-bg-actions,.dd-bg-edit-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:6px}
 dialog.dd-viewer .dd-bg-tools button{all:unset;box-sizing:border-box;padding:6px 12px;border:1px solid var(--dd-border);border-radius:999px;color:var(--dd-text);background:color-mix(in srgb,var(--dd-bg) 92%,transparent);font-size:12px;line-height:1.35;cursor:pointer;text-align:center}
-dialog.dd-viewer .dd-bg-tools button[hidden],dialog.dd-viewer .dd-bg-brushes[hidden]{display:none}
+dialog.dd-viewer .dd-bg-tools button[hidden],dialog.dd-viewer .dd-bg-brushes[hidden],dialog.dd-viewer .dd-bg-edit-actions[hidden]{display:none}
 dialog.dd-viewer .dd-bg-tools button:disabled{opacity:.4}
 dialog.dd-viewer .dd-bg-brushes{display:flex;flex-direction:column;gap:6px;padding:8px 10px;border:1px solid var(--dd-border);border-radius:12px;background:color-mix(in srgb,var(--dd-bg) 96%,transparent)}
 dialog.dd-viewer .dd-bg-brushes label{display:flex;align-items:center;gap:8px}
