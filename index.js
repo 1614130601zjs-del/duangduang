@@ -616,6 +616,8 @@ function ddApplyAutoFloat(dlg,enabled){
   if(!dlg.open&&typeof dlg.showModal==='function')dlg.showModal();
   ddBallInto(dlg);ddAttachJelly(state.stage.querySelector('img'));dlg._ddPaintBar?.();return;
  }
+ const stage=dlg.querySelector('.dd-stage'),bar=dlg.querySelector('.dd-jelly-bar');
+ if(!stage)return;
  if(dlg._ddFloatState)return;
  if(dlg._ddBgEraser){ddToast('请先完成或取消背景擦除');return;}
  const shell=document.createElement('div');shell.className='dd-float-shell';
