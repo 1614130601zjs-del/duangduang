@@ -18,7 +18,7 @@ function ddCfg(){
 }
 const ddSave=()=>{try{saveSettingsDebounced();}catch{}};
 
-// ===== 轻量果冻音效：Web Audio 合成，不加载外部音频文件 =====
+// ===== 果冻互动音效：程序化合成带掌面厚度的巴掌声 =====
 let ddAudioCtx=null;
 function ddPlaySound(kind='tap',strength=1){
  const c=ddCfg();if(!c.sfxOn)return;
@@ -29,33 +29,40 @@ function ddPlaySound(kind='tap',strength=1){
   const now=ac.currentTime,vol=Math.max(0,Math.min(1,Number(c.sfxVolume)||0))*Math.max(.25,Math.min(1.5,Number(strength)||1));
   if(!vol)return;
   const release=kind==='release',burst=kind==='burst';
-  // 巴掌声以噪声瞬态为主体：没有音高滑翔，只有“啪”的脆裂和掌面撞击。
-  const duration=release?.052:(burst?.072:.068);
-  const length=Math.ceil(ac.sampleRate*duration);
-  const buffer=ac.createBuffer(1,length,ac.sampleRate),samples=buffer.getChannelData(0);
-  for(let i=0;i<length;i++){
-   const t=i/ac.sampleRate;
-   // 极短前沿 + 快速衰减，保留一点点空气感，不拖尾。
-   const env=Math.exp(-t*(release?72:54));
-   samples[i]=(Math.random()*2-1)*env;
-  }
-  const source=ac.createBufferSource();source.buffer=buffer;
-  const makeLayer=(type,freq,q,level,attack,decay)=>{
-   const filter=ac.createBiquadFilter();filter.type=type;
-   if(freq)filter.frequency.setValueAtTime(freq,now);
-   if(q)filter.Q.setValueAtTime(q,now);
-   const gain=ac.createGain();gain.gain.setValueAtTime(.0001,now);
-   gain.gain.exponentialRampToValueAtTime(Math.max(.0002,vol*level),now+attack);
-   gain.gain.exponentialRampToValueAtTime(.0001,now+decay);
-   source.connect(filter);filter.connect(gain);gain.connect(ac.destination);
+  // 不再做“啪嗒”式的极短点击：主体约 180ms，前沿爆发，随后有掌面震动和空气余韵。
+  const master=ac.createGain();
+  master.gain.setValueAtTime(vol*(release?.52:1),now);
+  const comp=ac.createDynamicsCompressor();
+  comp.threshold.setValueAtTime(-18,now);comp.knee.setValueAtTime(12,now);
+  comp.ratio.setValueAtTime(3.5,now);comp.attack.setValueAtTime(.002,now);comp.release.setValueAtTime(.12,now);
+  master.connect(comp);comp.connect(ac.destination);
+  const addNoise=(duration,filterType,freq,q,level,decay,delay=0,tail=0)=>{
+   const count=Math.ceil(ac.sampleRate*duration);
+   const buffer=ac.createBuffer(1,count,ac.sampleRate),data=buffer.getChannelData(0);
+   for(let i=0;i<count;i++){
+    const t=i/ac.sampleRate;
+    const attack=1-Math.exp(-t/.0018);
+    const main=Math.exp(-t*decay);
+    // 很轻的二次掌面震动，避免声音像一次孤立的电子点击。
+    const ripple=1+tail*Math.exp(-Math.pow((t-.027)/.018,2));
+    data[i]=(Math.random()*2-1)*attack*main*ripple;
+   }
+   const source=ac.createBufferSource();source.buffer=buffer;
+   const filter=ac.createBiquadFilter();filter.type=filterType;
+   filter.frequency.setValueAtTime(freq,now+delay);if(q)filter.Q.setValueAtTime(q,now+delay);
+   const gain=ac.createGain();gain.gain.setValueAtTime(level*(release?.42:1),now+delay);
+   source.connect(filter);filter.connect(gain);gain.connect(master);
+   source.start(now+delay);source.stop(now+delay+duration);
   };
-  // 高中频的“啪”字头，决定听感像手掌而不是气泡。
-  makeLayer('highpass',1750,.7,release?.16:(burst?.48:.62),.0012,release?.042:.055);
-  // 中频掌面摩擦/撞击，让声音有真实的肉感。
-  makeLayer('bandpass',1050,.62,release?.12:(burst?.30:.38),.0018,release?.052:.065);
-  // 很轻的低频冲击，只垫厚度，不做“咚”的音高。
-  makeLayer('lowpass',330,.7,release?.055:(burst?.14:.19),.002,release?.045:.052);
-  source.start(now);source.stop(now+duration);
+  const scale=burst?.82:1;
+  // 高频裂响：负责清楚的“啪”字头，但不单独承担整个声音。
+  addNoise(release?.105:.115,'highpass',1450,.72,.34*scale,42,0,.12);
+  // 中频掌面撞击：声音主体，带一点皮肤/手掌接触的宽厚感。
+  addNoise(release?.145:.185,'bandpass',920,.58,.78*scale,24,.001,.22);
+  // 低频冲击：增加拍中物体的重量，不做明显的低音鼓音高。
+  addNoise(release?.155:.205,'lowpass',285,.7,.42*scale,19,.002,.18);
+  // 更轻的散开余韵，让“pia”有自然收尾，而不是立刻断掉。
+  addNoise(release?.12:.16,'bandpass',1850,.42,.105*scale,17,.018,.08);
  }catch{}
 }
 
