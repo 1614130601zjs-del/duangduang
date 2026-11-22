@@ -33,7 +33,7 @@ dialog.dd-viewer .dd-close{all:unset;position:absolute;top:6px;right:6px;width:2
 dialog.dd-viewer .dd-close svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2.4;stroke-linecap:round;pointer-events:none}
 
 /* 果冻小面板（在弹窗下方） */
-dialog.dd-viewer .dd-jelly-bar{position:absolute;top:100%;left:50%;transform:translateX(-50%);width:max-content;max-width:100vw;margin:10px 0 0;z-index:6;box-sizing:border-box}
+dialog.dd-viewer .dd-jelly-bar{position:relative;top:auto;left:auto;transform:none;width:max-content;max-width:calc(100vw - 28px);margin:10px auto 0;z-index:6;box-sizing:border-box}
 dialog.dd-viewer .dd-jelly-bar .dd-jb-head{display:flex;align-items:center;gap:4px;padding:3px;border-radius:999px;background:color-mix(in srgb,var(--dd-bg) 92%,transparent);border:1px solid var(--dd-border);justify-content:center}
 dialog.dd-viewer .dd-jelly-bar .dd-jb-panel{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);width:max-content;max-width:calc(100vw - 24px);padding:8px 10px;border-radius:14px;background:color-mix(in srgb,var(--dd-bg) 96%,transparent);border:1px solid var(--dd-border);box-shadow:0 4px 18px rgba(0,0,0,.35);display:flex;flex-direction:column;gap:6px;box-sizing:border-box}
 dialog.dd-viewer .dd-jelly-bar .dd-jb-panel[hidden]{display:none}
