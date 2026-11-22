@@ -814,20 +814,19 @@ async function ddHandleTap(x,y){
   if(!url){ddToast('这张图抓不到（可能被浏览器保护了）');return;}
   ddShowPickUi(false);
   if(ddPetPickMode){ddPetPickMode=false;ddExitPick();window.dispatchEvent(new CustomEvent('duangduang:pet-image-selected',{detail:{url}}));return;}
-  ddOpenViewer(url,hit.kind==='img'?hit.el:null);
+  ddOpenViewer(url);
  }catch(err){
   console.warn('[duangduang] 选图失败',err);
   ddToast('选图出错：'+((err&&err.message)||err));
  }
 }
-window.addEventListener('duangduang:pet-pick-start',()=>{ddPetPickMode=true;ddEnterPick();});
 function ddEnterPick(){
  if(ddPicking)return;
  ddPicking=true;document.querySelector('.dd-ball')?.classList.add('is-active');
  const root=document.createElement('div');root.className='dd-pick';
  root.innerHTML='<div class="dd-pick-hint"><span>点一张图片，把它放大来玩</span><button type="button" class="dd-pick-upload">上传图片</button><button type="button" class="dd-pick-exit" aria-label="退出选图">✕</button></div><div class="dd-hl"></div>';
- const hl=root.querySelector('.dd-hl');
  root.querySelector('.dd-pick-upload').addEventListener('click',()=>{ddExitPick();window.dispatchEvent(new CustomEvent('duangduang:pet-upload-request'));});
+ const hl=root.querySelector('.dd-hl');
  let raf=0,last=null,down=null;
  const ours=e=>!!(e.target&&e.target.closest&&e.target.closest('.dd-ball,.dd-viewer,.dd-toast,.dd-pick-upload'));
  const probe=e=>{last=e;if(raf)return;raf=requestAnimationFrame(()=>{raf=0;ddHighlight(ddFindAt(last.clientX,last.clientY));});};
