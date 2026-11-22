@@ -438,3 +438,16 @@ body>#lp-panel{--lp-panel:#fff;--lp-text:#171717;--lp-muted:#777;--lp-border:#de
 
 #lp-float,#lp-float img,#lp-float canvas,.lp-stage img,.lp-stage canvas{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 #lp-float img,.lp-stage img{-webkit-user-drag:none}
+
+/* 悬浮球入口：先选择来源，再进入完整桌宠编辑器 */
+.lp-entry-chooser{position:fixed;z-index:2147483000;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.42);backdrop-filter:blur(5px)}
+.lp-entry-chooser[hidden]{display:none}
+.lp-entry-card{position:relative;display:flex;flex-direction:column;gap:12px;width:min(390px,100%);padding:25px 20px 20px;border:1px solid #e5e5e5;border-radius:16px;background:#fff;color:#171717;box-shadow:0 18px 60px #0003}
+.lp-entry-card>small{font-size:9px;letter-spacing:2px;color:#999}
+.lp-entry-card>b{font-size:23px;letter-spacing:-.5px}
+.lp-entry-card>p{margin:0 0 5px;color:#777;font-size:12px;line-height:1.6}
+.lp-entry-close{position:absolute;right:12px;top:10px;width:30px;height:30px;border:0;background:transparent;color:#555;font-size:24px}
+.lp-entry-option{display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:14px 15px;border:1px solid #e5e5e5;border-radius:9px;background:#fafafa;color:#171717;text-align:left}
+.lp-entry-option:active{background:#eee}
+.lp-entry-option>span{font-size:14px;font-weight:700}
+.lp-entry-option>small{font-size:11px;color:#888}
