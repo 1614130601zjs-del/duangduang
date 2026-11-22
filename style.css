@@ -227,3 +227,52 @@ dialog.dd-viewer .dd-bg-tools .dd-bg-status{max-width:calc(100vw - 40px);margin-
 dialog.dd-viewer.dd-auto-float .dd-bg-tools{
  bottom:calc(env(safe-area-inset-bottom,0px) + 72px);
 }
+
+/* 独立悬浮主体：沿用 duangpet 的容器移动、四角缩放与收回交互 */
+dialog.dd-viewer.dd-auto-float{
+ box-sizing:border-box;width:100vw;height:100dvh;max-width:none;max-height:none;inset:0;
+ padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;overflow:hidden;
+}
+dialog.dd-viewer.dd-auto-float::backdrop{background:transparent;backdrop-filter:none}
+dialog.dd-viewer.dd-auto-float .dd-float-shell{
+ position:absolute;box-sizing:border-box;overflow:visible;z-index:10;
+ border:1px dashed color-mix(in srgb,var(--dd-accent) 75%,transparent);
+ border-radius:8px;touch-action:none;
+}
+dialog.dd-viewer.dd-auto-float .dd-float-shell .dd-stage{
+ position:absolute;left:0;top:0;display:block;width:max-content;max-width:none;
+ padding:0;transform-origin:top left;touch-action:pan-y;
+}
+dialog.dd-viewer.dd-auto-float .dd-float-shell .dd-stage>img{
+ display:block;max-width:min(72vw,420px);max-height:58dvh;width:auto;height:auto;
+ object-fit:contain;border-radius:7px;box-shadow:0 8px 28px #0005;
+}
+dialog.dd-viewer.dd-auto-float .dd-float-move{
+ position:absolute;left:50%;top:-34px;transform:translateX(-50%);
+ padding:6px 14px;border:1px solid var(--dd-border);border-radius:999px;
+ background:var(--dd-bg);color:var(--dd-text);font-size:12px;line-height:1.2;
+ white-space:nowrap;touch-action:none;cursor:grab;user-select:none;
+}
+dialog.dd-viewer.dd-auto-float .dd-float-return{
+ all:unset;position:absolute;right:-10px;top:-42px;z-index:12;
+ box-sizing:border-box;padding:6px 12px;border:1px solid var(--dd-border);
+ border-radius:999px;background:var(--dd-bg);color:var(--dd-text);
+ font-size:12px;line-height:1.2;cursor:pointer;
+}
+dialog.dd-viewer.dd-auto-float .dd-float-resize{
+ all:unset;position:absolute;z-index:13;box-sizing:border-box;
+ width:18px;height:18px;border:2px solid var(--dd-accent);
+ border-radius:50%;background:var(--dd-bg);touch-action:none;
+}
+dialog.dd-viewer.dd-auto-float .dd-resize-nw{left:-9px;top:-9px;cursor:nwse-resize}
+dialog.dd-viewer.dd-auto-float .dd-resize-ne{right:-9px;top:-9px;cursor:nesw-resize}
+dialog.dd-viewer.dd-auto-float .dd-resize-sw{left:-9px;bottom:-9px;cursor:nesw-resize}
+dialog.dd-viewer.dd-auto-float .dd-resize-se{right:-9px;bottom:-9px;cursor:nwse-resize}
+dialog.dd-viewer.dd-auto-float .dd-float-shell .dd-jelly-bar{
+ position:absolute;left:50%;top:calc(100% + 8px);bottom:auto;
+ transform:translateX(-50%);margin:0;max-width:calc(100vw - 20px);
+}
+dialog.dd-viewer.dd-auto-float .dd-bg-tools{
+ position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 72px);
+ transform:translateX(-50%);z-index:2147483000;
+}
