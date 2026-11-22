@@ -576,16 +576,18 @@ async function ddSetBgEraser(dlg,enabled){
  canvas.addEventListener('pointerdown',async e=>{
   if(e.pointerType==='mouse'&&e.button!==0)return;e.preventDefault();if(st.pointer)return;
   try{canvas.setPointerCapture(e.pointerId);}catch{}
-  const stroke={id:e.pointerId,ready:false,last:point(e),before:null,pendingEnd:false};st.pointer=stroke;
+  const stroke={id:e.pointerId,ready:false,points:[point(e)],before:null,pendingEnd:false};st.pointer=stroke;
   try{
    stroke.before=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('撤销记录创建失败')),'image/png'));
-   stroke.ready=true;stamp(stroke.last);
+   stroke.ready=true;
+   for(let i=1;i<stroke.points.length;i++)line(stroke.points[i-1],stroke.points[i]);
+   stamp(stroke.points[0]);
    if(stroke.pendingEnd){st.pointer=null;await finishStroke(stroke);}
   }catch(err){st.pointer=null;ddToast(err.message||'擦除操作失败');}
  });
  canvas.addEventListener('pointermove',e=>{
   const stroke=st.pointer;if(!stroke||stroke.id!==e.pointerId)return;e.preventDefault();
-  const p=point(e);if(stroke.ready)line(stroke.last,p);stroke.last=p;
+  const p=point(e),last=stroke.points[stroke.points.length-1];stroke.points.push(p);if(stroke.ready)line(last,p);
  });
  const end=async e=>{
   const stroke=st.pointer;if(!stroke||stroke.id!==e.pointerId)return;
