@@ -468,7 +468,7 @@ function ddBuildBar(overlay){
     +'<div class="dd-jb-row"><b>选区</b><button type="button" data-jb="sel">✎ 涂选区</button><button type="button" data-jb="clr2">清除</button><em class="dd-jb-hint"></em></div>'
     +'<div class="dd-jb-row"><b>交互</b><button type="button" data-jb-in="drag">拖动</button><button type="button" data-jb-in="shake">摇晃</button><button type="button" data-jb-in="burst" title="点一下图，自己连晃几下">点一下连晃</button>'
     +'<span class="dd-jb-dd"><button type="button" class="dd-jb-dd-btn" data-jb-dd aria-haspopup="listbox" aria-expanded="false"><span data-jb-dd-label>Q弹</span> ▾</button><span class="dd-jb-dd-list" role="listbox" hidden><button type="button" role="option" data-jb-strength="soft">软糯</button><button type="button" role="option" data-jb-strength="mid">Q弹</button><button type="button" role="option" data-jb-strength="bouncy">DUANG</button></span></span></div>'
-    +'<div class="dd-jb-row dd-jb-image-tools"><b>图片</b><button type="button" data-jb-image="erase">擦除背景</button><button type="button" data-jb-image="float" disabled>放出桌宠</button></div>'
+    +'<div class="dd-jb-row dd-jb-image-tools"><b>图片</b><button type="button" data-jb-image="erase">擦除背景</button><button type="button" data-jb-image="float">放出桌宠</button></div>'
     +'<div class="dd-jb-row"><b>反馈</b><span class="dd-jb-brush dd-jb-reach"><small>小</small><input type="range" min="40" max="220" step="5" data-jb-reach aria-label="反馈范围"><small>大</small></span><em class="dd-jb-hint">手指按下去影响多大一块</em></div>'
     +'<div class="dd-jb-msg" role="status"></div></div>';
    const $b=sel=>bar.querySelector(sel);
@@ -512,7 +512,7 @@ function ddBuildBar(overlay){
     if(d.jb==='power'){ddJellyCfg();c.jellyOn=!c.jellyOn;if(!c.jellyOn)S.selecting=false;ddSave();rebind();return;}
     if(d.jb==='more'){const p=$b('.dd-jb-panel');p.hidden=!p.hidden;paintBar();return;}
     if(d.jbImage==='erase'){if(!overlay._ddBgEraser){ddLastCutoutBlob=null;const release=$b('[data-jb-image="float"]');if(release)release.disabled=true;ddSetBgEraser(overlay,true);}return;}
-    if(d.jbImage==='float'){if(!ddLastCutoutBlob){ddToast('请先擦除背景并点击完成');return;}window.dispatchEvent(new CustomEvent('duangduang:pet-release-image',{detail:{blob:ddLastCutoutBlob}}));if(overlay.open)overlay.close();return;}
+    if(d.jbImage==='float'){if(overlay._ddBgEraser){ddToast('请先完成或取消背景擦除');return;}const source=ddLastCutoutBlob?{blob:ddLastCutoutBlob}:{url:overlay._ddOriginalUrl||img?.currentSrc||img?.src};if(!source.blob&&!source.url){ddToast('没有可放出的图片');return;}window.dispatchEvent(new CustomEvent('duangduang:pet-release-image',{detail:source}));if(overlay.open)overlay.close();return;}
     if(d.jb==='sel'){ddJellyCfg();if(!c.jellyOn){c.jellyOn=true;ddSave();}S.selecting=true;S.tool='add';rebind();return;}
     if(d.jbTool){S.tool=d.jbTool;paintBar();return;}
     if(d.jb==='done'){S.selecting=false;rebind();return;}
@@ -556,7 +556,7 @@ function ddBuildBgTools(dlg){
 async function ddSetBgEraser(dlg,enabled){
  const img=dlg?.querySelector('img'),stage=dlg?.querySelector('.dd-stage'),panel=dlg?._ddBgTools;
  if(!img||!stage||!panel)return;
- if(!enabled){const st=dlg._ddBgEraser;if(st){st.canvas.remove();img.style.visibility='';dlg._ddBgEraser=null;ddAttachJelly(img);}panel.querySelector('.dd-bg-brushes').hidden=true;panel.querySelector('.dd-bg-edit-actions').hidden=true;return;}
+ if(!enabled){const st=dlg._ddBgEraser;if(st){st.canvas.remove();img.style.visibility='';dlg._ddBgEraser=null;ddAttachJelly(img);}panel.querySelector('.dd-bg-brushes').hidden=true;panel.querySelector('.dd-bg-edit-actions').hidden=true;document.querySelectorAll('[data-jb-image="float"]').forEach(button=>button.disabled=false);return;}
  if(dlg.classList.contains('dd-auto-float'))ddApplyAutoFloat(dlg,false);
  if(dlg._ddBgEraser)return;
  try{if(!img.complete)await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error('图片载入失败'));});}catch{ddToast('图片载入失败，暂时无法擦除');return;}
@@ -723,7 +723,7 @@ function ddOpenViewer(url,sourceEl=null){
 function ddBallInto(dlg){const b=document.querySelector('.dd-ball');if(b&&b.parentElement!==dlg)dlg.append(b);}
 function ddBallBack(){const b=document.querySelector('.dd-ball');if(b&&b.parentElement!==document.body)document.body.append(b);}
 function ddOnViewerClosed(){if(ddPicking)ddShowPickUi(true);}
-window.addEventListener('duangduang:pet-float-returned',e=>{const blob=e.detail?.blob;if(!blob)return;ddLastCutoutBlob=blob;const dlg=document.querySelector('dialog.dd-viewer');const source=dlg?._ddSourceElement||ddLastSourceElement||null;const url=URL.createObjectURL(blob);ddOpenViewer(url,source);const current=document.querySelector('dialog.dd-viewer');if(current)current._ddReturnedUrl=url;const release=document.querySelector('#dd-image-float');if(release)release.disabled=false;});
+window.addEventListener('duangduang:pet-float-returned',e=>{const blob=e.detail?.blob,sourceUrl=e.detail?.url;if(!blob&&!sourceUrl)return;ddLastCutoutBlob=blob||null;const dlg=document.querySelector('dialog.dd-viewer');const source=dlg?._ddSourceElement||ddLastSourceElement||null;const url=blob?URL.createObjectURL(blob):sourceUrl;ddOpenViewer(url,source);const current=document.querySelector('dialog.dd-viewer');if(current&&blob)current._ddReturnedUrl=url;document.querySelectorAll('[data-jb-image="float"]').forEach(button=>button.disabled=false);});
 window.addEventListener('duangduang:pet-release-failed',e=>ddToast(e.detail?.message||'桌宠放出失败'));
 
 // ===== 取图：从页面上点中的元素里拿到可以显示的地址 =====
@@ -815,7 +815,7 @@ async function ddHandleTap(x,y){
   const url=await ddSourceOf(hit);
   if(!url){ddToast('这张图抓不到（可能被浏览器保护了）');return;}
   ddShowPickUi(false);
-  ddLastCutoutBlob=null;const releaseButton=document.querySelector('#dd-image-float');if(releaseButton)releaseButton.disabled=true;ddOpenViewer(url,hit.el);
+  ddLastCutoutBlob=null;ddOpenViewer(url,hit.el);document.querySelectorAll('[data-jb-image="float"]').forEach(button=>button.disabled=false);
  }catch(err){
   console.warn('[duangduang] 选图失败',err);
   ddToast('选图出错：'+((err&&err.message)||err));
@@ -1193,7 +1193,7 @@ window.DuangDuang={
   try{
    const url=await ddMaterialize(String(src||'').trim());
    if(!url)return false;
-   ddLastCutoutBlob=null;const releaseButton=document.querySelector('#dd-image-float');if(releaseButton)releaseButton.disabled=true;ddOpenViewer(url);return true;
+   ddLastCutoutBlob=null;ddOpenViewer(url);document.querySelectorAll('[data-jb-image="float"]').forEach(button=>button.disabled=false);return true;
   }catch(err){console.warn('[duangduang] openImage 失败',err);return false;}
  },
  close(){const d=document.querySelector('dialog.dd-viewer[open]');if(d){d.close();return true;}return false;},
