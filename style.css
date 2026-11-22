@@ -184,3 +184,46 @@ dialog.dd-viewer.dd-auto-float .dd-jelly-bar{position:fixed;left:50%;top:auto;bo
 dialog.dd-viewer.dd-auto-float .dd-bg-tools{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 66px);transform:translateX(-50%);width:max-content;max-width:calc(100vw - 24px);margin:0}
 dialog.dd-viewer.dd-auto-float .dd-bg-tools .dd-bg-brushes{display:none!important}
 dialog.dd-viewer.dd-auto-float::backdrop{background:transparent;backdrop-filter:none}
+
+/* 修正移动端放大弹窗的擦除工具布局：工具固定在可视区内，不被大图挤出屏幕 */
+dialog.dd-viewer .dd-bg-tools{
+ position:fixed;
+ z-index:2147483000;
+ left:50%;
+ bottom:calc(env(safe-area-inset-bottom,0px) + 72px);
+ transform:translateX(-50%);
+ width:max-content;
+ max-width:calc(100vw - 20px);
+ margin:0;
+ padding:8px 10px;
+ border:1px solid var(--dd-border);
+ border-radius:14px;
+ background:color-mix(in srgb,var(--dd-bg) 96%,transparent);
+ box-shadow:0 4px 18px rgba(0,0,0,.35);
+}
+dialog.dd-viewer .dd-bg-tools button{
+ display:inline-flex;
+ align-items:center;
+ justify-content:center;
+ min-height:32px;
+ white-space:nowrap;
+}
+dialog.dd-viewer .dd-bg-tools .dd-bg-edit-actions{
+ display:flex;
+ justify-content:center;
+ flex-wrap:wrap;
+ gap:6px;
+ margin-top:6px;
+}
+dialog.dd-viewer .dd-bg-tools .dd-bg-edit-actions[hidden],
+dialog.dd-viewer .dd-bg-tools .dd-bg-brushes[hidden],
+dialog.dd-viewer .dd-bg-tools button[hidden]{display:none!important}
+dialog.dd-viewer .dd-bg-tools .dd-bg-brushes{
+ display:flex;
+ flex-direction:column;
+ gap:6px;
+}
+dialog.dd-viewer .dd-bg-tools .dd-bg-status{max-width:calc(100vw - 40px);margin-top:5px}
+dialog.dd-viewer.dd-auto-float .dd-bg-tools{
+ bottom:calc(env(safe-area-inset-bottom,0px) + 72px);
+}
