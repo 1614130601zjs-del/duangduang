@@ -468,6 +468,7 @@ function ddBuildBar(overlay){
     +'<div class="dd-jb-row"><b>选区</b><button type="button" data-jb="sel">✎ 涂选区</button><button type="button" data-jb="clr2">清除</button><em class="dd-jb-hint"></em></div>'
     +'<div class="dd-jb-row"><b>交互</b><button type="button" data-jb-in="drag">拖动</button><button type="button" data-jb-in="shake">摇晃</button><button type="button" data-jb-in="burst" title="点一下图，自己连晃几下">点一下连晃</button>'
     +'<span class="dd-jb-dd"><button type="button" class="dd-jb-dd-btn" data-jb-dd aria-haspopup="listbox" aria-expanded="false"><span data-jb-dd-label>Q弹</span> ▾</button><span class="dd-jb-dd-list" role="listbox" hidden><button type="button" role="option" data-jb-strength="soft">软糯</button><button type="button" role="option" data-jb-strength="mid">Q弹</button><button type="button" role="option" data-jb-strength="bouncy">DUANG</button></span></span></div>'
+    +'<div class="dd-jb-row dd-jb-image-tools"><b>图片</b><button type="button" data-jb-image="erase">擦除背景</button><button type="button" data-jb-image="float" disabled>放出桌宠</button></div>'
     +'<div class="dd-jb-row"><b>反馈</b><span class="dd-jb-brush dd-jb-reach"><small>小</small><input type="range" min="40" max="220" step="5" data-jb-reach aria-label="反馈范围"><small>大</small></span><em class="dd-jb-hint">手指按下去影响多大一块</em></div>'
     +'<div class="dd-jb-msg" role="status"></div></div>';
    const $b=sel=>bar.querySelector(sel);
@@ -510,6 +511,8 @@ function ddBuildBar(overlay){
     const c=ddCfg(),img=overlay.querySelector('img')||overlay._ddFloatingImg,S=img?ddJellyState(img):{has:false,selecting:false},d=b.dataset;
     if(d.jb==='power'){ddJellyCfg();c.jellyOn=!c.jellyOn;if(!c.jellyOn)S.selecting=false;ddSave();rebind();return;}
     if(d.jb==='more'){const p=$b('.dd-jb-panel');p.hidden=!p.hidden;paintBar();return;}
+    if(d.jbImage==='erase'){if(!overlay._ddBgEraser){ddLastCutoutBlob=null;const release=$b('[data-jb-image="float"]');if(release)release.disabled=true;ddSetBgEraser(overlay,true);}return;}
+    if(d.jbImage==='float'){if(!ddLastCutoutBlob){ddToast('请先擦除背景并点击完成');return;}window.dispatchEvent(new CustomEvent('duangduang:pet-release-image',{detail:{blob:ddLastCutoutBlob}}));return;}
     if(d.jb==='sel'){ddJellyCfg();if(!c.jellyOn){c.jellyOn=true;ddSave();}S.selecting=true;S.tool='add';rebind();return;}
     if(d.jbTool){S.tool=d.jbTool;paintBar();return;}
     if(d.jb==='done'){S.selecting=false;rebind();return;}
@@ -538,7 +541,7 @@ function ddToast(text){
 }
 function ddBuildBgTools(dlg){
  const panel=document.createElement('div');panel.className='dd-bg-tools';
- panel.innerHTML='<div class="dd-bg-brushes" hidden><label>笔刷大小 <input type="range" min="1" max="20" value="7" data-bg-size><output data-bg-size-value>7%</output></label><label>软度 <input type="range" min="0" max="100" value="65" data-bg-soft><output data-bg-soft-value>65%</output></label></div><div class="dd-bg-edit-actions" hidden><button type="button" data-bg-action="undo" disabled>撤销</button><button type="button" data-bg-action="cancel">取消</button><button type="button" data-bg-action="done">完成</button></div><small class="dd-bg-status" role="status">图片工具入口位于扩展设置的「Duang 果冻」分区。</small>';
+ panel.innerHTML='<div class="dd-bg-brushes" hidden><label>笔刷大小 <input type="range" min="1" max="20" value="7" data-bg-size><output data-bg-size-value>7%</output></label><label>软度 <input type="range" min="0" max="100" value="65" data-bg-soft><output data-bg-soft-value>65%</output></label></div><div class="dd-bg-edit-actions" hidden><button type="button" data-bg-action="undo" disabled>撤销</button><button type="button" data-bg-action="cancel">取消</button><button type="button" data-bg-action="done">完成</button></div><small class="dd-bg-status" role="status">从下方「设置」进入图片工具。</small>';
  const q=sel=>panel.querySelector(sel);
  panel.addEventListener('input',e=>{if(e.target.matches('[data-bg-size]'))q('[data-bg-size-value]').textContent=e.target.value+'%';if(e.target.matches('[data-bg-soft]'))q('[data-bg-soft-value]').textContent=e.target.value+'%';});
  panel.addEventListener('click',async e=>{
@@ -599,10 +602,10 @@ async function ddFinishBgEraser(dlg){
  const st=dlg?._ddBgEraser;if(!st)return;
  const img=dlg.querySelector('img'),blob=await new Promise(resolve=>st.canvas.toBlob(resolve,'image/png'));
  if(!blob){ddToast('透明图片生成失败');return;}
- const url=URL.createObjectURL(blob);ddLastCutoutBlob=blob;const releaseButton=document.querySelector('#dd-image-float');if(releaseButton)releaseButton.disabled=false;if(dlg._ddCutoutUrl)URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl=url;dlg._ddCutoutReady=true;st.canvas.remove();dlg._ddBgEraser=null;img.style.visibility='';img.src=url;
+ const url=URL.createObjectURL(blob);ddLastCutoutBlob=blob;document.querySelectorAll('[data-jb-image="float"]').forEach(button=>button.disabled=false);if(dlg._ddCutoutUrl)URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl=url;dlg._ddCutoutReady=true;st.canvas.remove();dlg._ddBgEraser=null;img.style.visibility='';img.src=url;
  await new Promise(resolve=>{if(img.complete)resolve();else{img.onload=resolve;img.onerror=resolve;}});
  dlg._ddBgTools.querySelector('.dd-bg-brushes').hidden=true;dlg._ddBgTools.querySelector('.dd-bg-edit-actions').hidden=true;ddAttachJelly(img);
- dlg._ddBgTools.querySelector('.dd-bg-status').textContent='背景擦除完成。原图已保留；可到扩展设置的「图片工具」放出桌宠。';
+ dlg._ddBgTools.querySelector('.dd-bg-status').textContent='背景擦除完成。原图已保留；可在下方「设置」中放出桌宠。';
  return blob;
 }
 function ddApplyAutoFloat(dlg,enabled){
@@ -1107,10 +1110,6 @@ function ddMountSettings(){
   +'<div class="dd-set-row"><label for="dd-sfx-volume">音量</label><input id="dd-sfx-volume" type="range" min="0" max="100" step="5"><span id="dd-sfx-volume-v"></span></div>'
   +'<small class="dd-note">调整果冻互动时的音效音量。</small>'
   +'</div></details>'
-  +'<details class="dd-setting-section"><summary><span>图片工具</span><small>擦除背景与放出桌宠</small></summary><div class="dd-setting-section-body">'
-  +'<div class="dd-set-row dd-image-tool-actions"><button type="button" class="menu_button" id="dd-image-erase">擦除背景</button><button type="button" class="menu_button" id="dd-image-float" disabled>放出桌宠</button></div>'
-  +'<small class="dd-note" id="dd-image-tool-status">选中图片后先关闭放大弹窗，再点这里擦除背景；完成擦除并关闭弹窗后，可从这里放出桌宠。</small>'
-  +'</div></details>'
   +'<details class="dd-setting-section"><summary><span>点一下连晃</span><small>连续动作的次数与幅度</small></summary><div class="dd-setting-section-body">'
   +'<small class="dd-note">先在放大图下方的“交互”里打开“点一下连晃”，这里调整它的动作参数。</small>'
   +'<div class="dd-set-row"><label for="dd-burst-mode">模式</label><select id="dd-burst-mode" class="text_pole"><option value="wobble">摇晃（随机方向晃几下）</option><option value="press">点击反馈（按压回弹，重复几次）</option></select></div>'
@@ -1120,12 +1119,6 @@ function ddMountSettings(){
   +'</div></details>'
   +'<small class="dd-settings-footer">点悬浮球进入选图模式，再点任意一张图，就会放大到弹窗里玩果冻。范围、选区和交互方式都在弹窗下方的小面板里。</small></div></div>'
  host.append(box);
- {const erase=box.querySelector('#dd-image-erase'),release=box.querySelector('#dd-image-float'),status=box.querySelector('#dd-image-tool-status');
-  const paint=()=>{release.disabled=!ddLastCutoutBlob;status.textContent=ddLastImageUrl?'已记住最近选中的图片。擦除完成后，可在这里放出桌宠。':'选中图片后先关闭放大弹窗，再点这里擦除背景。';};
-  erase.addEventListener('click',async()=>{if(!ddLastImageUrl){ddToast('请先选中一张图片');return;}ddLastCutoutBlob=null;paint();ddOpenViewer(ddLastImageUrl,ddLastSourceElement);const dlg=document.querySelector('dialog.dd-viewer');await ddSetBgEraser(dlg,true);});
-  release.addEventListener('click',()=>{if(!ddLastCutoutBlob){ddToast('请先擦除背景并点击完成');return;}window.dispatchEvent(new CustomEvent('duangduang:pet-release-image',{detail:{blob:ddLastCutoutBlob}}));});
-  paint();
- }
  {const q=id=>box.querySelector(id),mode=q('#dd-burst-mode'),n=q('#dd-burst-n'),pw=q('#dd-burst-power'),dc=q('#dd-burst-decay');
   const paint=()=>{const b=ddBurstCfg();mode.value=b.mode;n.value=b.n;pw.value=Math.round(b.power*100);dc.checked=b.decay;q('#dd-burst-n-v').textContent=b.n+' 次';q('#dd-burst-power-v').textContent=Math.round(b.power*100)+'%';};
   const set=()=>{const c=ddCfg();c.jellyBurstMode=mode.value;c.jellyBurstN=Number(n.value);c.jellyBurstPower=Number(pw.value)/100;c.jellyBurstDecay=dc.checked;ddSave();paint();};
