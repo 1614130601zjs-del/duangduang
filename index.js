@@ -472,7 +472,7 @@ function ddBuildBar(overlay){
    const $b=sel=>bar.querySelector(sel);
    const setMsg=t=>{$b('.dd-jb-msg').textContent=t||'';};
    const paintBar=()=>{
-    const c=ddJellyCfg(),img=overlay.querySelector('img'),S=img?ddJellyState(img):{has:false,selecting:false};
+    const c=ddJellyCfg(),img=overlay.querySelector('img')||overlay._ddFloatingImg,S=img?ddJellyState(img):{has:false,selecting:false};
     $b('[data-jb=power]').textContent=c.on?'果冻：开':'果冻：关';$b('[data-jb=power]').classList.toggle('is-active',c.on);
     bar.classList.toggle('is-off',!c.on);bar.classList.toggle('is-selecting',!!S.selecting);
     bar.querySelectorAll('[data-jb-scope]').forEach(b=>b.classList.toggle('is-active',b.dataset.jbScope===c.scope));
@@ -486,11 +486,11 @@ function ddBuildBar(overlay){
     $b('[data-jb=more]').textContent=$b('.dd-jb-panel').hidden?'设置 ▴':'收起 ▾';
    };
    const syncSettings=()=>{const sel=document.querySelector('#dd-strength');if(sel)sel.value=['soft','bouncy'].includes(ddCfg().jellyStrength)?ddCfg().jellyStrength:'mid';};
-   const rebind=()=>{ddAttachJelly(overlay.querySelector('img'));paintBar();syncSettings();};
+   const rebind=()=>{ddAttachJelly(overlay.querySelector('img')||overlay._ddFloatingImg);paintBar();syncSettings();};
    bar.addEventListener('input',e=>{
     const rr=e.target.closest('[data-jb-reach]');
     if(rr){e.stopPropagation();ddCfg().jellyReach=Number(rr.value)/100;ddSave();
-     const img=overlay.querySelector('img'),host=img&&(img.offsetParent||img.parentElement);if(!host)return;
+     const img=overlay.querySelector('img')||overlay._ddFloatingImg,host=img&&(img.offsetParent||img.parentElement);if(!host)return;
      let ring=host.querySelector('.dd-jb-ring');if(!ring){ring=document.createElement('div');ring.className='dd-jb-ring';host.appendChild(ring);}
      const d=2*.19*ddJellyReach()*Math.min(img.clientWidth,img.clientHeight);
      ring.style.cssText='position:absolute;pointer-events:none;z-index:4;border-radius:50%;border:2px dashed #ff4081;background:rgba(255,64,129,.18);width:'+d+'px;height:'+d+'px;left:'+(img.offsetLeft+img.clientWidth/2-d/2)+'px;top:'+(img.offsetTop+img.clientHeight/2-d/2)+'px';
@@ -498,7 +498,7 @@ function ddBuildBar(overlay){
     const bi=e.target.closest('[data-jb-brush]');if(!bi)return;e.stopPropagation();
     ddCfg().jellyBrush=Number(bi.value)/100;ddSave();
     // 临时画一个圈让你看到当前粗细
-    const img=overlay.querySelector('img'),host=img.offsetParent||img.parentElement;if(!host)return;
+    const img=overlay.querySelector('img')||overlay._ddFloatingImg,host=img&&(img.offsetParent||img.parentElement);if(!host)return;
     let ring=host.querySelector('.dd-jb-ring');if(!ring){ring=document.createElement('div');ring.className='dd-jb-ring';host.appendChild(ring);}
     const d=2.2*ddJellyBrush()*Math.min(img.clientWidth,img.clientHeight);
     ring.style.cssText='position:absolute;pointer-events:none;z-index:4;border-radius:50%;border:2px solid #ff4081;background:rgba(255,64,129,.25);width:'+d+'px;height:'+d+'px;left:'+(img.offsetLeft+img.clientWidth/2-d/2)+'px;top:'+(img.offsetTop+img.clientHeight/2-d/2)+'px';
@@ -506,7 +506,7 @@ function ddBuildBar(overlay){
    });
    bar.addEventListener('click',async e=>{
     const b=e.target.closest('button');if(!b)return;e.preventDefault();e.stopPropagation();
-    const c=ddCfg(),img=overlay.querySelector('img'),S=ddJellyState(img),d=b.dataset;
+    const c=ddCfg(),img=overlay.querySelector('img')||overlay._ddFloatingImg,S=img?ddJellyState(img):{has:false,selecting:false},d=b.dataset;
     if(d.jb==='power'){ddJellyCfg();c.jellyOn=!c.jellyOn;if(!c.jellyOn)S.selecting=false;ddSave();rebind();return;}
     if(d.jb==='more'){const p=$b('.dd-jb-panel');p.hidden=!p.hidden;paintBar();return;}
     if(d.jb==='sel'){ddJellyCfg();if(!c.jellyOn){c.jellyOn=true;ddSave();}S.selecting=true;S.tool='add';rebind();return;}
@@ -523,7 +523,7 @@ function ddBuildBar(overlay){
      rebind();
     }
    });
-   overlay._ddPaintBar=paintBar;overlay._ddMsg=setMsg;overlay.append(bar);
+   overlay._ddPaintBar=paintBar;overlay._ddMsg=setMsg;overlay._ddFloatingImg=null;overlay.append(bar);
   
  return overlay.querySelector('.dd-jelly-bar');
 }
@@ -538,7 +538,7 @@ function ddBuildBgTools(dlg){
  const panel=document.createElement('div');panel.className='dd-bg-tools';
  panel.innerHTML='<div class="dd-bg-actions"><button type="button" data-bg-action="erase">擦除背景</button><button type="button" data-bg-action="float" disabled>放出悬浮主体</button><button type="button" data-bg-action="restore" hidden>恢复原图</button><button type="button" data-bg-action="return" hidden>返回大图</button></div><div class="dd-bg-brushes" hidden><label>笔刷大小 <input type="range" min="1" max="20" value="7" data-bg-size><output data-bg-size-value>7%</output></label><label>软度 <input type="range" min="0" max="100" value="65" data-bg-soft><output data-bg-soft-value>65%</output></label></div><div class="dd-bg-edit-actions" hidden><button type="button" data-bg-action="undo" disabled>撤销</button><button type="button" data-bg-action="cancel">取消</button><button type="button" data-bg-action="done">完成</button></div><small class="dd-bg-status" role="status">可先正常互动；需要时再手动擦除背景。</small>';
  const q=s=>panel.querySelector(s);
- const sync=()=>{q('[data-bg-action="float"]').disabled=!dlg._ddCutoutReady;q('[data-bg-action="restore"]').hidden=!dlg._ddCutoutReady;q('[data-bg-action="return"]').hidden=!dlg.classList.contains('dd-auto-float');};
+ const sync=()=>{q('[data-bg-action="float"]').disabled=!dlg._ddCutoutReady;q('[data-bg-action="restore"]').hidden=!dlg._ddCutoutReady;q('[data-bg-action="return"]').hidden=!dlg._ddFloatState;};
  panel.addEventListener('input',e=>{if(e.target.matches('[data-bg-size]'))q('[data-bg-size-value]').textContent=e.target.value+'%';if(e.target.matches('[data-bg-soft]'))q('[data-bg-soft-value]').textContent=e.target.value+'%';});
  panel.addEventListener('click',async e=>{
   const b=e.target.closest('[data-bg-action]');if(!b)return;
@@ -613,74 +613,78 @@ function ddApplyAutoFloat(dlg,enabled){
   const state=dlg._ddFloatState;if(!state)return;
   state.stage.style.transform='';state.stage.style.transformOrigin='';
   state.stage.style.position='';state.stage.style.left='';state.stage.style.top='';
-  dlg.append(state.stage);
-  if(state.bar)dlg.append(state.bar);
-  state.shell.remove();dlg._ddFloatState=null;dlg.classList.remove('dd-auto-float');
-  dlg._ddPaintBar?.();return;
+  dlg.append(state.stage);if(state.bar)dlg.append(state.bar);
+  state.shell.remove();dlg._ddFloatState=null;
+  if(!dlg.open&&typeof dlg.showModal==='function')dlg.showModal();
+  ddBallInto(dlg);ddAttachJelly(state.stage.querySelector('img'));dlg._ddPaintBar?.();return;
  }
  if(dlg._ddFloatState)return;
  if(dlg._ddBgEraser){ddToast('请先完成或取消背景擦除');return;}
- const rect=stage.getBoundingClientRect(),baseW=Math.max(1,rect.width),baseH=Math.max(1,rect.height);
  const shell=document.createElement('div');shell.className='dd-float-shell';
  const move=document.createElement('div');move.className='dd-float-move';move.textContent='拖动摆放';
  move.setAttribute('aria-label','拖动主体位置');
- const close=document.createElement('button');close.type='button';close.className='dd-float-return';close.textContent='收回';
- close.addEventListener('pointerdown',e=>e.stopPropagation());
- close.addEventListener('click',()=>ddApplyAutoFloat(dlg,false));
- shell.append(move,close);
- const state={shell,stage,bar,baseW,baseH,scale:.62,left:0,top:0};
+ const back=document.createElement('button');back.type='button';back.className='dd-float-return';back.textContent='收回';
+ back.addEventListener('pointerdown',e=>e.stopPropagation());
+ back.addEventListener('click',()=>ddApplyAutoFloat(dlg,false));
+ shell.append(move,back);
+ const state={shell,stage,bar,scale:.62,left:0,top:0,baseW:0,baseH:0};
  dlg._ddFloatState=state;
- shell.append(stage);if(bar)shell.append(bar);dlg.append(shell);
- dlg.classList.add('dd-auto-float');
- const maxScale=()=>Math.max(.12,Math.min(2.4,(innerWidth-24)/baseW,(innerHeight-110)/baseH));
- const apply=()=>{
-  state.scale=Math.max(.12,Math.min(maxScale(),state.scale));
-  const w=baseW*state.scale,h=baseH*state.scale;
-  shell.style.width=w+'px';shell.style.height=h+'px';
-  shell.style.left=Math.max(8,Math.min(innerWidth-w-8,state.left))+'px';
-  shell.style.top=Math.max(44,Math.min(innerHeight-h-70,state.top))+'px';
-  stage.style.position='absolute';stage.style.left='0';stage.style.top='0';
-  stage.style.transformOrigin='top left';stage.style.transform='scale('+state.scale+')';
- };
- state.left=Math.max(8,(innerWidth-baseW*.62)/2);state.top=Math.max(48,(innerHeight-baseH*.62)/2);
- apply();
- let drag=null;
- move.addEventListener('pointerdown',e=>{
-  if(e.pointerType==='mouse'&&e.button!==0)return;
-  const r=shell.getBoundingClientRect();drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:r.left,top:r.top};
-  try{move.setPointerCapture(e.pointerId);}catch{}
-  e.preventDefault();e.stopPropagation();
- });
- move.addEventListener('pointermove',e=>{
-  if(!drag||drag.id!==e.pointerId)return;
-  state.left=drag.left+e.clientX-drag.x;state.top=drag.top+e.clientY-drag.y;apply();
- });
- const moveEnd=e=>{if(drag&&drag.id===e.pointerId)drag=null;};
- move.addEventListener('pointerup',moveEnd);move.addEventListener('pointercancel',moveEnd);
- ['nw','ne','sw','se'].forEach(dir=>{
-  const grip=document.createElement('button');grip.type='button';grip.className='dd-float-resize dd-resize-'+dir;
-  grip.setAttribute('aria-label','调整主体大小');grip.title='拖动调整大小';shell.append(grip);
-  let resize=null;
-  grip.addEventListener('pointerdown',e=>{
+ shell.append(stage);if(bar)shell.append(bar);document.body.append(shell);
+ if(dlg.open)dlg.close();
+ requestAnimationFrame(()=>{
+  if(dlg._ddFloatState!==state)return;
+  const r=stage.getBoundingClientRect();state.baseW=Math.max(1,r.width);state.baseH=Math.max(1,r.height);
+  const maxScale=()=>Math.max(.12,Math.min(2.4,(innerWidth-24)/state.baseW,(innerHeight-120)/state.baseH));
+  const apply=()=>{
+   state.scale=Math.max(.12,Math.min(maxScale(),state.scale));
+   const w=state.baseW*state.scale,h=state.baseH*state.scale;
+   shell.style.width=w+'px';shell.style.height=h+'px';
+   state.left=Math.max(8,Math.min(innerWidth-w-8,state.left));
+   state.top=Math.max(44,Math.min(innerHeight-h-80,state.top));
+   shell.style.left=state.left+'px';shell.style.top=state.top+'px';
+   stage.style.position='absolute';stage.style.left='0';stage.style.top='0';
+   stage.style.transformOrigin='top left';stage.style.transform='scale('+state.scale+')';
+  };
+  state.left=Math.max(8,(innerWidth-state.baseW*state.scale)/2);
+  state.top=Math.max(48,(innerHeight-state.baseH*state.scale)/2);apply();
+  let drag=null;
+  move.addEventListener('pointerdown',e=>{
    if(e.pointerType==='mouse'&&e.button!==0)return;
-   const r=shell.getBoundingClientRect();resize={id:e.pointerId,x:e.clientX,y:e.clientY,scale:state.scale,left:r.left,top:r.top,width:r.width,height:r.height};
-   try{grip.setPointerCapture(e.pointerId);}catch{}e.preventDefault();e.stopPropagation();
+   drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:state.left,top:state.top};
+   try{move.setPointerCapture(e.pointerId);}catch{}e.preventDefault();e.stopPropagation();
   });
-  grip.addEventListener('pointermove',e=>{
-   if(!resize||resize.id!==e.pointerId)return;
-   const dx=e.clientX-resize.x,dy=e.clientY-resize.y,sign=dir.includes('w')?-1:1,vertical=dir.includes('n')?-1:1;
-   const delta=Math.abs(dx)>Math.abs(dy)*(baseW/baseH)?dx*sign:dy*vertical*(baseW/baseH);
-   state.scale=resize.scale+delta/baseW;
-   const w=baseW*state.scale,h=baseH*state.scale;
-   state.left=dir.includes('w')?resize.left+resize.width-w:resize.left;
-   state.top=dir.includes('n')?resize.top+resize.height-h:resize.top;apply();
-   e.preventDefault();e.stopPropagation();
+  move.addEventListener('pointermove',e=>{
+   if(!drag||drag.id!==e.pointerId)return;
+   state.left=drag.left+e.clientX-drag.x;state.top=drag.top+e.clientY-drag.y;apply();
   });
-  const end=e=>{if(resize&&resize.id===e.pointerId)resize=null;};
-  grip.addEventListener('pointerup',end);grip.addEventListener('pointercancel',end);
+  const moveEnd=e=>{if(drag&&drag.id===e.pointerId)drag=null;};
+  move.addEventListener('pointerup',moveEnd);move.addEventListener('pointercancel',moveEnd);
+  ['nw','ne','sw','se'].forEach(dir=>{
+   const grip=document.createElement('button');grip.type='button';grip.className='dd-float-resize dd-resize-'+dir;
+   grip.setAttribute('aria-label','调整主体大小');grip.title='拖动调整大小';shell.append(grip);
+   let resize=null;
+   grip.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='mouse'&&e.button!==0)return;
+    resize={id:e.pointerId,x:e.clientX,y:e.clientY,scale:state.scale,left:state.left,top:state.top,width:state.baseW*state.scale,height:state.baseH*state.scale};
+    try{grip.setPointerCapture(e.pointerId);}catch{}e.preventDefault();e.stopPropagation();
+   });
+   grip.addEventListener('pointermove',e=>{
+    if(!resize||resize.id!==e.pointerId)return;
+    const dx=e.clientX-resize.x,dy=e.clientY-resize.y,sign=dir.includes('w')?-1:1,vertical=dir.includes('n')?-1:1;
+    const delta=Math.abs(dx)>Math.abs(dy)*(state.baseW/state.baseH)?dx*sign:dy*vertical*(state.baseW/state.baseH);
+    state.scale=resize.scale+delta/state.baseW;
+    const w=state.baseW*state.scale,h=state.baseH*state.scale;
+    state.left=dir.includes('w')?resize.left+resize.width-w:resize.left;
+    state.top=dir.includes('n')?resize.top+resize.height-h:resize.top;apply();
+    e.preventDefault();e.stopPropagation();
+   });
+   const end=e=>{if(resize&&resize.id===e.pointerId)resize=null;};
+   grip.addEventListener('pointerup',end);grip.addEventListener('pointercancel',end);
+  });
+  window.addEventListener('resize',()=>{if(dlg._ddFloatState===state)apply();});
+  const img=stage.querySelector('img');if(img)ddAttachJelly(img);
+  dlg._ddPaintBar?.();
  });
- window.addEventListener('resize',()=>{if(dlg._ddFloatState===state)apply();},{once:false});
- dlg._ddPaintBar?.();
 }
 function ddOpenViewer(url){
  let dlg=document.querySelector('dialog.dd-viewer');
@@ -688,12 +692,12 @@ function ddOpenViewer(url){
   dlg=document.createElement('dialog');dlg.className='dd-viewer';dlg.setAttribute('aria-label','果冻放大图');
   dlg.innerHTML='<button type="button" class="dd-close" aria-label="关闭" title="关闭"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button><div class="dd-stage"><img alt="放大查看的图片" draggable="false"></div>';
   const tools=ddBuildBgTools(dlg);dlg.append(tools);
-  const bar=ddBuildBar(dlg);dlg.append(bar);
+  const bar=ddBuildBar(dlg);dlg.append(bar);bar._ddOwner=dlg;
   dlg.addEventListener('click',e=>{
    // 手指抬起后系统会补发一个 click，落在刚打开的弹窗上，会被当成点了背景而立刻关掉；打开后短时间内忽略点背景。
    if(e.target===dlg&&Date.now()-(dlg._ddOpenedAt||0)<600)return;
    if((e.target===dlg&&!dlg.classList.contains('dd-auto-float'))||e.target.closest('.dd-close')){if(dlg.open)dlg.close();else dlg.removeAttribute('open');}});
-  dlg.addEventListener('close',()=>{ddSetBgEraser(dlg,false);ddApplyAutoFloat(dlg,false);ddBallBack();const im=dlg.querySelector('img');im?._ddJellyAbort?.abort();im?.removeAttribute('src');if(dlg._ddCutoutUrl){URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl='';}dlg._ddCutoutReady=false;ddOnViewerClosed();});
+  dlg.addEventListener('close',()=>{if(dlg._ddFloatState){ddBallBack();return;}ddSetBgEraser(dlg,false);ddBallBack();const im=dlg.querySelector('img');im?._ddJellyAbort?.abort();im?.removeAttribute('src');if(dlg._ddCutoutUrl){URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl='';}dlg._ddCutoutReady=false;ddOnViewerClosed();});
   document.body.append(dlg);
  }
  const img=dlg.querySelector('img');
@@ -1010,7 +1014,7 @@ function ddAutoFire(power){
  if(document.hidden)return;
  const c=ddCfg();
  if(c.autoBall&&document.querySelector('.dd-ball'))try{ddBallKick?.(power);}catch{}
- if(c.autoViewer){const img=document.querySelector('dialog.dd-viewer[open] img');try{img?._ddKick?.(power);}catch{}}
+ if(c.autoViewer){const img=document.querySelector('.dd-float-shell img,dialog.dd-viewer[open] img');try{img?._ddKick?.(power);}catch{}}
 }
 function ddAutoStart(){
  clearTimeout(ddAutoTimer);ddAutoTimer=0;
