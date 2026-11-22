@@ -35,6 +35,7 @@ function ddJellyCfg(){
 function ddBurstCfg(){const c=ddCfg();return{mode:c.jellyBurstMode==='press'?'press':'wobble',n:Math.max(1,Math.min(10,Math.round(Number(c.jellyBurstN)||3))),decay:c.jellyBurstDecay!==false,power:Math.max(.2,Math.min(2,Number(c.jellyBurstPower)||1))};}
 function ddBurst(img,pt){
  const b=ddBurstCfg();let i=0;
+ window.DuangDuang?.playSound?.('burst',b.power);
  const go=()=>{
   if(!img.isConnected)return;
   const fac=b.decay?(b.n>1?1-i/b.n*.82:1):1,k=b.power*fac;
