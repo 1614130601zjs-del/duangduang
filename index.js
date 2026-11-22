@@ -1109,7 +1109,7 @@ function ddMountSettings(){
   +'</div></details>'
   +'<details class="dd-setting-section"><summary><span>图片工具</span><small>擦除背景与放出桌宠</small></summary><div class="dd-setting-section-body">'
   +'<div class="dd-set-row dd-image-tool-actions"><button type="button" class="menu_button" id="dd-image-erase">擦除背景</button><button type="button" class="menu_button" id="dd-image-float" disabled>放出桌宠</button></div>'
-  +'<small class="dd-note" id="dd-image-tool-status">先在选图模式中选中一张图片，再从这里启动背景擦除；完成擦除后即可放出桌宠。</small>'
+  +'<small class="dd-note" id="dd-image-tool-status">选中图片后先关闭放大弹窗，再点这里擦除背景；完成擦除并关闭弹窗后，可从这里放出桌宠。</small>'
   +'</div></details>'
   +'<details class="dd-setting-section"><summary><span>点一下连晃</span><small>连续动作的次数与幅度</small></summary><div class="dd-setting-section-body">'
   +'<small class="dd-note">先在放大图下方的“交互”里打开“点一下连晃”，这里调整它的动作参数。</small>'
@@ -1121,7 +1121,7 @@ function ddMountSettings(){
   +'<small class="dd-settings-footer">点悬浮球进入选图模式，再点任意一张图，就会放大到弹窗里玩果冻。范围、选区和交互方式都在弹窗下方的小面板里。</small></div></div>'
  host.append(box);
  {const erase=box.querySelector('#dd-image-erase'),release=box.querySelector('#dd-image-float'),status=box.querySelector('#dd-image-tool-status');
-  const paint=()=>{release.disabled=!ddLastCutoutBlob;status.textContent=ddLastImageUrl?'已记住最近选中的图片。擦除完成后，可在这里放出桌宠。':'先在选图模式中选中一张图片，再从这里启动背景擦除。';};
+  const paint=()=>{release.disabled=!ddLastCutoutBlob;status.textContent=ddLastImageUrl?'已记住最近选中的图片。擦除完成后，可在这里放出桌宠。':'选中图片后先关闭放大弹窗，再点这里擦除背景。';};
   erase.addEventListener('click',async()=>{if(!ddLastImageUrl){ddToast('请先选中一张图片');return;}ddLastCutoutBlob=null;paint();ddOpenViewer(ddLastImageUrl,ddLastSourceElement);const dlg=document.querySelector('dialog.dd-viewer');await ddSetBgEraser(dlg,true);});
   release.addEventListener('click',()=>{if(!ddLastCutoutBlob){ddToast('请先擦除背景并点击完成');return;}window.dispatchEvent(new CustomEvent('duangduang:pet-release-image',{detail:{blob:ddLastCutoutBlob}}));});
   paint();
