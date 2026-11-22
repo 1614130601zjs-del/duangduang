@@ -2,9 +2,10 @@
 // 点悬浮球进入选图模式，点任意一张图（普通图 / canvas / 背景图 / 同源 iframe 里的图），会把它复制一份到自己的弹窗里玩，不改动原图，也不会被别的插件重绘冲掉。
 import { extension_settings } from '/scripts/extensions.js';
 import { saveSettingsDebounced, getRequestHeaders } from '/script.js';
+import './pet.js';
 
 const EXT='duangduang';
-const defaults={ballOn:true,ballX:1,ballY:.62,ballShake:true,ballIcon:'default',ballIconPicked:false,ballFixed:26,ballCustoms:[],ballSize:56,jellyOn:true,jellyScope:'local',jellyTap:false,jellyDrag:true,jellyShake:false,jellyStrength:'mid',jellyBrush:.075,jellyBurst:false,jellyBurstN:3,jellyBurstMode:'wobble',jellyBurstDecay:true,jellyBurstPower:1,autoOn:false,autoMode:'interval',autoSec:8,autoPower:1,autoBall:true,autoViewer:true};
+const defaults={ballOn:true,ballX:1,ballY:.62,ballShake:true,ballIcon:'default',ballIconPicked:false,ballFixed:26,ballCustoms:[],ballSize:56,jellyOn:true,jellyScope:'local',jellyTap:false,jellyDrag:true,jellyShake:false,jellyStrength:'mid',jellyBrush:.075,jellyBurst:false,jellyBurstN:3,jellyBurstMode:'wobble',jellyBurstDecay:true,jellyBurstPower:1,sfxOn:false,sfxVolume:.45,autoOn:false,autoMode:'interval',autoSec:8,autoPower:1,autoBall:true,autoViewer:true};
 function ddCfg(){
  if(!extension_settings[EXT])extension_settings[EXT]={};
  const c=extension_settings[EXT];
@@ -17,6 +18,71 @@ function ddCfg(){
  return c;
 }
 const ddSave=()=>{try{saveSettingsDebounced();}catch{}};
+
+// ===== 果冻互动音效：程序化合成带掌面厚度的巴掌声 =====
+let ddAudioCtx=null;
+const DD_SLAP_URL='https://cdn.jsdelivr.net/gh/1614130601zjs-del/duangduang@feature/tap-sfx/assets/slap.mp3';
+let ddSlapAudio=null;
+function ddPlaySound(kind='tap',strength=1){
+ const c=ddCfg();if(!c.sfxOn)return;
+ if(kind==='burst'||kind==='release'){
+  try{
+   if(!ddSlapAudio){ddSlapAudio=new Audio(DD_SLAP_URL);ddSlapAudio.preload='auto';}
+   const a=ddSlapAudio;
+   a.volume=Math.min(1,Math.max(0,Number(c.sfxVolume)||0)*Math.max(.25,Math.min(1.5,Number(strength)||1)));
+   a.currentTime=0;
+   const playing=a.play();
+   if(playing&&typeof playing.catch==='function')playing.catch(()=>ddPlaySynth(kind,strength));
+   return;
+  }catch{}
+ }
+ ddPlaySynth(kind,strength);
+}
+function ddPlaySynth(kind='tap',strength=1){
+ const c=ddCfg();if(!c.sfxOn)return;
+ const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;
+ try{
+  if(!ddAudioCtx)ddAudioCtx=new Ctx();
+  const ac=ddAudioCtx;if(ac.state==='suspended')ac.resume();
+  const now=ac.currentTime,vol=Math.max(0,Math.min(1,Number(c.sfxVolume)||0))*Math.max(.25,Math.min(1.5,Number(strength)||1));
+  if(!vol)return;
+  const release=kind==='release',burst=kind==='burst';
+  // 不再做“啪嗒”式的极短点击：主体约 180ms，前沿爆发，随后有掌面震动和空气余韵。
+  const master=ac.createGain();
+  master.gain.setValueAtTime(vol*(release?.52:1),now);
+  const comp=ac.createDynamicsCompressor();
+  comp.threshold.setValueAtTime(-18,now);comp.knee.setValueAtTime(12,now);
+  comp.ratio.setValueAtTime(3.5,now);comp.attack.setValueAtTime(.002,now);comp.release.setValueAtTime(.12,now);
+  master.connect(comp);comp.connect(ac.destination);
+  const addNoise=(duration,filterType,freq,q,level,decay,delay=0,tail=0)=>{
+   const count=Math.ceil(ac.sampleRate*duration);
+   const buffer=ac.createBuffer(1,count,ac.sampleRate),data=buffer.getChannelData(0);
+   for(let i=0;i<count;i++){
+    const t=i/ac.sampleRate;
+    const attack=1-Math.exp(-t/.0018);
+    const main=Math.exp(-t*decay);
+    // 很轻的二次掌面震动，避免声音像一次孤立的电子点击。
+    const ripple=1+tail*Math.exp(-Math.pow((t-.027)/.018,2));
+    data[i]=(Math.random()*2-1)*attack*main*ripple;
+   }
+   const source=ac.createBufferSource();source.buffer=buffer;
+   const filter=ac.createBiquadFilter();filter.type=filterType;
+   filter.frequency.setValueAtTime(freq,now+delay);if(q)filter.Q.setValueAtTime(q,now+delay);
+   const gain=ac.createGain();gain.gain.setValueAtTime(level*(release?.42:1),now+delay);
+   source.connect(filter);filter.connect(gain);gain.connect(master);
+   source.start(now+delay);source.stop(now+delay+duration);
+  };
+  const scale=burst?.82:1;
+  // 高频裂响：负责清楚的“啪”字头，但不单独承担整个声音。
+  addNoise(release?.105:.115,'highpass',1450,.72,.34*scale,42,0,.12);
+  // 中频掌面撞击：声音主体，带一点皮肤/手掌接触的宽厚感。
+  addNoise(release?.145:.185,'bandpass',920,.58,.78*scale,24,.001,.22);
+  // 低频冲击：增加拍中物体的重量，不做明显的低音鼓音高。
+  addNoise(release?.155:.205,'lowpass',285,.7,.42*scale,19,.002,.18);
+  // 更轻的散开余韵，让“pia”有自然收尾，而不是立刻断掉。
+  addNoise(release?.12:.16,'bandpass',1850,.42,.105*scale,17,.018,.08);
+ }catch{}
+}
 
 // ===== 放大图小互动（果冻）：范围（局部 / 抹开 / 全屏）× 选区（可选）× 交互（点击 / 拖动 / 摇晃） =====
 // 弹簧动画只在触摸 / 拖动 / 摇晃时跑，松手停稳后自动结束；选区只在放大图打开期间保留。
@@ -38,6 +104,8 @@ function ddJellyCfg(){
 function ddBurstCfg(){const c=ddCfg();return{mode:c.jellyBurstMode==='press'?'press':'wobble',n:Math.max(1,Math.min(10,Math.round(Number(c.jellyBurstN)||3))),decay:c.jellyBurstDecay!==false,power:Math.max(.2,Math.min(2,Number(c.jellyBurstPower)||1))};}
 function ddBurst(img,pt){
  const b=ddBurstCfg();let i=0;
+ // 一次连晃是一个完整动作，音效只在起始时播放一次。
+ ddPlaySound('burst',b.power);
  const go=()=>{
   if(!img.isConnected)return;
   const fac=b.decay?(b.n>1?1-i/b.n*.82:1):1,k=b.power*fac;
@@ -290,6 +358,7 @@ function ddAttachJelly(img){
    else if(p.moved&&conf.drag){aff.v[2]-=(aff.x[2]-1)*.35;aff.v[3]-=(aff.x[3]-1)*.35;}
    aff.t=[0,0,1,1,0];
   }
+  if(!S.selecting&&!p.moved&&Date.now()-p.t<450&&!conf.burst)ddPlaySound('tap'); else if(p.moved&&conf.drag)ddPlaySound('release');
   kick();
   if(conf.burst&&!S.selecting&&!p.moved&&Date.now()-p.t<450)ddBurst(img,[cx,cy]);
  };
@@ -378,6 +447,7 @@ function ddAttachJellyWhole(img,conf){
   if(!drag||(e&&e.pointerId!==drag.id))return;
   const d=drag;drag=null;try{img.releasePointerCapture(d.id);}catch{}
   const quick=Date.now()-d.t<450&&!d.moved;
+  if(quick&&!conf.burst)ddPlaySound('tap'); else if(d.moved&&conf.drag)ddPlaySound('release');
   if(quick&&conf.burst){ddBurst(img);rest();return;}
   if(quick&&conf.tap){squish();return;}
   if(d.moved&&conf.drag){
@@ -398,12 +468,13 @@ function ddBuildBar(overlay){
     +'<div class="dd-jb-row"><b>选区</b><button type="button" data-jb="sel">✎ 涂选区</button><button type="button" data-jb="clr2">清除</button><em class="dd-jb-hint"></em></div>'
     +'<div class="dd-jb-row"><b>交互</b><button type="button" data-jb-in="drag">拖动</button><button type="button" data-jb-in="shake">摇晃</button><button type="button" data-jb-in="burst" title="点一下图，自己连晃几下">点一下连晃</button>'
     +'<span class="dd-jb-dd"><button type="button" class="dd-jb-dd-btn" data-jb-dd aria-haspopup="listbox" aria-expanded="false"><span data-jb-dd-label>Q弹</span> ▾</button><span class="dd-jb-dd-list" role="listbox" hidden><button type="button" role="option" data-jb-strength="soft">软糯</button><button type="button" role="option" data-jb-strength="mid">Q弹</button><button type="button" role="option" data-jb-strength="bouncy">DUANG</button></span></span></div>'
+    +'<div class="dd-jb-row dd-jb-image-tools"><b>图片</b><button type="button" data-jb-image="erase">擦除背景</button><button type="button" data-jb-image="float">放出桌宠</button></div>'
     +'<div class="dd-jb-row"><b>反馈</b><span class="dd-jb-brush dd-jb-reach"><small>小</small><input type="range" min="40" max="220" step="5" data-jb-reach aria-label="反馈范围"><small>大</small></span><em class="dd-jb-hint">手指按下去影响多大一块</em></div>'
     +'<div class="dd-jb-msg" role="status"></div></div>';
    const $b=sel=>bar.querySelector(sel);
    const setMsg=t=>{$b('.dd-jb-msg').textContent=t||'';};
    const paintBar=()=>{
-    const c=ddJellyCfg(),img=overlay.querySelector('img'),S=img?ddJellyState(img):{has:false,selecting:false};
+    const c=ddJellyCfg(),img=overlay.querySelector('img')||overlay._ddFloatingImg,S=img?ddJellyState(img):{has:false,selecting:false};
     $b('[data-jb=power]').textContent=c.on?'果冻：开':'果冻：关';$b('[data-jb=power]').classList.toggle('is-active',c.on);
     bar.classList.toggle('is-off',!c.on);bar.classList.toggle('is-selecting',!!S.selecting);
     bar.querySelectorAll('[data-jb-scope]').forEach(b=>b.classList.toggle('is-active',b.dataset.jbScope===c.scope));
@@ -417,11 +488,11 @@ function ddBuildBar(overlay){
     $b('[data-jb=more]').textContent=$b('.dd-jb-panel').hidden?'设置 ▴':'收起 ▾';
    };
    const syncSettings=()=>{const sel=document.querySelector('#dd-strength');if(sel)sel.value=['soft','bouncy'].includes(ddCfg().jellyStrength)?ddCfg().jellyStrength:'mid';};
-   const rebind=()=>{ddAttachJelly(overlay.querySelector('img'));paintBar();syncSettings();};
+   const rebind=()=>{ddAttachJelly(overlay.querySelector('img')||overlay._ddFloatingImg);paintBar();syncSettings();};
    bar.addEventListener('input',e=>{
     const rr=e.target.closest('[data-jb-reach]');
     if(rr){e.stopPropagation();ddCfg().jellyReach=Number(rr.value)/100;ddSave();
-     const img=overlay.querySelector('img'),host=img&&(img.offsetParent||img.parentElement);if(!host)return;
+     const img=overlay.querySelector('img')||overlay._ddFloatingImg,host=img&&(img.offsetParent||img.parentElement);if(!host)return;
      let ring=host.querySelector('.dd-jb-ring');if(!ring){ring=document.createElement('div');ring.className='dd-jb-ring';host.appendChild(ring);}
      const d=2*.19*ddJellyReach()*Math.min(img.clientWidth,img.clientHeight);
      ring.style.cssText='position:absolute;pointer-events:none;z-index:4;border-radius:50%;border:2px dashed #ff4081;background:rgba(255,64,129,.18);width:'+d+'px;height:'+d+'px;left:'+(img.offsetLeft+img.clientWidth/2-d/2)+'px;top:'+(img.offsetTop+img.clientHeight/2-d/2)+'px';
@@ -429,7 +500,7 @@ function ddBuildBar(overlay){
     const bi=e.target.closest('[data-jb-brush]');if(!bi)return;e.stopPropagation();
     ddCfg().jellyBrush=Number(bi.value)/100;ddSave();
     // 临时画一个圈让你看到当前粗细
-    const img=overlay.querySelector('img'),host=img.offsetParent||img.parentElement;if(!host)return;
+    const img=overlay.querySelector('img')||overlay._ddFloatingImg,host=img&&(img.offsetParent||img.parentElement);if(!host)return;
     let ring=host.querySelector('.dd-jb-ring');if(!ring){ring=document.createElement('div');ring.className='dd-jb-ring';host.appendChild(ring);}
     const d=2.2*ddJellyBrush()*Math.min(img.clientWidth,img.clientHeight);
     ring.style.cssText='position:absolute;pointer-events:none;z-index:4;border-radius:50%;border:2px solid #ff4081;background:rgba(255,64,129,.25);width:'+d+'px;height:'+d+'px;left:'+(img.offsetLeft+img.clientWidth/2-d/2)+'px;top:'+(img.offsetTop+img.clientHeight/2-d/2)+'px';
@@ -437,9 +508,11 @@ function ddBuildBar(overlay){
    });
    bar.addEventListener('click',async e=>{
     const b=e.target.closest('button');if(!b)return;e.preventDefault();e.stopPropagation();
-    const c=ddCfg(),img=overlay.querySelector('img'),S=ddJellyState(img),d=b.dataset;
+    const c=ddCfg(),img=overlay.querySelector('img')||overlay._ddFloatingImg,S=img?ddJellyState(img):{has:false,selecting:false},d=b.dataset;
     if(d.jb==='power'){ddJellyCfg();c.jellyOn=!c.jellyOn;if(!c.jellyOn)S.selecting=false;ddSave();rebind();return;}
     if(d.jb==='more'){const p=$b('.dd-jb-panel');p.hidden=!p.hidden;paintBar();return;}
+    if(d.jbImage==='erase'){if(!overlay._ddBgEraser){ddLastCutoutBlob=null;const release=$b('[data-jb-image="float"]');if(release)release.disabled=true;ddSetBgEraser(overlay,true);}return;}
+    if(d.jbImage==='float'){if(overlay._ddBgEraser){ddToast('请先完成或取消背景擦除');return;}const source=ddLastCutoutBlob?{blob:ddLastCutoutBlob}:{url:overlay._ddOriginalUrl||img?.currentSrc||img?.src};if(!source.blob&&!source.url){ddToast('没有可放出的图片');return;}const result=await new Promise(resolve=>{let settled=false;const finish=value=>{if(settled)return;settled=true;clearTimeout(timer);resolve(value);};const timer=setTimeout(()=>finish({ok:false,message:'桌宠模块没有响应，请检查桌宠扩展是否正常加载'}),15000);window.dispatchEvent(new CustomEvent('duangduang:pet-release-image',{detail:{...source,mask:{mask:(S&&S.mask)?Array.from(S.mask):[],has:!!(S&&S.has)},cfg:ddInheritCfg(c),onResult:finish}}));});if(!result?.ok){ddToast(result?.message||'桌宠放出失败');return;}if(ddPicking)ddExitPick();if(overlay.open)overlay.close();return;}
     if(d.jb==='sel'){ddJellyCfg();if(!c.jellyOn){c.jellyOn=true;ddSave();}S.selecting=true;S.tool='add';rebind();return;}
     if(d.jbTool){S.tool=d.jbTool;paintBar();return;}
     if(d.jb==='done'){S.selecting=false;rebind();return;}
@@ -454,42 +527,204 @@ function ddBuildBar(overlay){
      rebind();
     }
    });
-   overlay._ddPaintBar=paintBar;overlay._ddMsg=setMsg;overlay.append(bar);
+   overlay._ddPaintBar=paintBar;overlay._ddMsg=setMsg;overlay._ddFloatingImg=null;overlay.append(bar);
   
  return overlay.querySelector('.dd-jelly-bar');
 }
 
 // ===== 放大弹窗 =====
 let ddPicking=false,ddPickUi=null;
+let ddLastImageUrl='',ddLastSourceElement=null,ddLastCutoutBlob=null;
 function ddToast(text){
  let t=document.querySelector('.dd-toast');if(!t){t=document.createElement('div');t.className='dd-toast';t.setAttribute('role','status');document.body.append(t);}
  t.textContent=text;t.classList.add('is-on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('is-on'),2600);
 }
-function ddOpenViewer(url){
+function ddBuildBgTools(dlg){
+ const panel=dlg.querySelector('.dd-jb-panel');if(!panel)return null;
+ panel.insertAdjacentHTML('beforeend','<div class="dd-bg-brushes" hidden><label>笔刷大小 <input type="range" min="1" max="20" value="7" data-bg-size><output data-bg-size-value>7%</output></label><label>软度 <input type="range" min="0" max="100" value="65" data-bg-soft><output data-bg-soft-value>65%</output></label></div><div class="dd-bg-edit-actions" hidden><button type="button" data-bg-action="undo" disabled>撤销</button><button type="button" data-bg-action="cancel">取消</button><button type="button" data-bg-action="done">完成</button></div><small class="dd-bg-status" role="status">选择「擦除背景」后即可在图片上涂抹。</small>');
+ const q=sel=>panel.querySelector(sel);
+ panel.addEventListener('input',e=>{if(e.target.matches('[data-bg-size]'))q('[data-bg-size-value]').textContent=e.target.value+'%';if(e.target.matches('[data-bg-soft]'))q('[data-bg-soft-value]').textContent=e.target.value+'%';});
+ panel.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-bg-action]');if(!b)return;
+  const action=b.dataset.bgAction;
+  if(action==='undo'){const st=dlg._ddBgEraser;if(st?.history.length){const blob=st.history.pop(),bitmap=await createImageBitmap(blob);st.ctx.clearRect(0,0,st.canvas.width,st.canvas.height);st.ctx.drawImage(bitmap,0,0);bitmap.close?.();q('[data-bg-action="undo"]').disabled=!st.history.length;}return;}
+  if(action==='cancel'){ddSetBgEraser(dlg,false);q('.dd-bg-edit-actions').hidden=true;q('.dd-bg-status').textContent='已取消擦除，原图保持不变。';return;}
+  if(action==='done'){await ddFinishBgEraser(dlg);q('.dd-bg-edit-actions').hidden=true;return;}
+ });
+ dlg._ddBgTools=panel;return panel;
+}
+async function ddSetBgEraser(dlg,enabled){
+ const img=dlg?.querySelector('img'),stage=dlg?.querySelector('.dd-stage'),panel=dlg?._ddBgTools;
+ if(!img||!stage||!panel)return;
+ if(!enabled){const st=dlg._ddBgEraser;if(st){st.canvas.remove();img.style.visibility='';dlg._ddBgEraser=null;ddAttachJelly(img);}panel.querySelector('.dd-bg-brushes').hidden=true;panel.querySelector('.dd-bg-edit-actions').hidden=true;document.querySelectorAll('[data-jb-image="float"]').forEach(button=>button.disabled=false);return;}
+ if(dlg.classList.contains('dd-auto-float'))ddApplyAutoFloat(dlg,false);
+ if(dlg._ddBgEraser)return;
+ try{if(!img.complete)await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error('图片载入失败'));});}catch{ddToast('图片载入失败，暂时无法擦除');return;}
+ if(!img.naturalWidth||!img.naturalHeight){ddToast('这张图片暂时无法编辑');return;}
+ img._ddJellyAbort?.abort();
+ const canvas=document.createElement('canvas');canvas.className='dd-bg-eraser-canvas';canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
+ const ctx=canvas.getContext('2d');try{ctx.drawImage(img,0,0);}catch{ddToast('这张图片受跨域保护，无法进行背景擦除；可以换一张图片试试');return;}const imgRect=img.getBoundingClientRect(),stageRect=stage.getBoundingClientRect();canvas.style.left=(imgRect.left-stageRect.left)+'px';canvas.style.top=(imgRect.top-stageRect.top)+'px';canvas.style.width=imgRect.width+'px';canvas.style.height=imgRect.height+'px';stage.append(canvas);img.style.visibility='hidden';
+ const st={canvas,ctx,history:[],pointer:null};dlg._ddBgEraser=st;
+ const point=e=>{const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)/Math.max(1,r.width)*canvas.width,y:(e.clientY-r.top)/Math.max(1,r.height)*canvas.height};};
+ const stamp=p=>{const radius=Math.max(1,Math.min(canvas.width,canvas.height)*Number(panel.querySelector('[data-bg-size]').value||7)/200),softness=Number(panel.querySelector('[data-bg-soft]').value||65);ctx.save();ctx.globalCompositeOperation='destination-out';if(softness<=0){ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();}else{const inner=radius*(1-softness/100),g=ctx.createRadialGradient(p.x,p.y,inner,p.x,p.y,radius);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();}ctx.restore();};
+ const line=(a,b)=>{const radius=Math.max(1,Math.min(canvas.width,canvas.height)*Number(panel.querySelector('[data-bg-size]').value||7)/200),dist=Math.hypot(b.x-a.x,b.y-a.y),steps=Math.max(1,Math.ceil(dist/Math.max(1,radius*.22)));for(let i=1;i<=steps;i++){const t=i/steps;stamp({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});}};
+ const finishStroke=async stroke=>{
+  if(!stroke?.ready)return;
+  st.history.push(stroke.before);if(st.history.length>8)st.history.shift();
+  panel.querySelector('[data-bg-action="undo"]').disabled=!st.history.length;
+ };
+ canvas.addEventListener('pointerdown',async e=>{
+  if(e.pointerType==='mouse'&&e.button!==0)return;e.preventDefault();if(st.pointer)return;
+  try{canvas.setPointerCapture(e.pointerId);}catch{}
+  const stroke={id:e.pointerId,ready:false,points:[point(e)],before:null,pendingEnd:false};st.pointer=stroke;
+  try{
+   stroke.before=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('撤销记录创建失败')),'image/png'));
+   stroke.ready=true;
+   for(let i=1;i<stroke.points.length;i++)line(stroke.points[i-1],stroke.points[i]);
+   stamp(stroke.points[0]);
+   if(stroke.pendingEnd){st.pointer=null;await finishStroke(stroke);}
+  }catch(err){st.pointer=null;ddToast(err.message||'擦除操作失败');}
+ });
+ canvas.addEventListener('pointermove',e=>{
+  const stroke=st.pointer;if(!stroke||stroke.id!==e.pointerId)return;e.preventDefault();
+  const p=point(e),last=stroke.points[stroke.points.length-1];stroke.points.push(p);if(stroke.ready)line(last,p);
+ });
+ const end=async e=>{
+  const stroke=st.pointer;if(!stroke||stroke.id!==e.pointerId)return;
+  try{canvas.releasePointerCapture(e.pointerId);}catch{}
+  if(!stroke.ready){stroke.pendingEnd=true;return;}
+  st.pointer=null;await finishStroke(stroke);
+ };
+ canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);
+ panel.querySelector('.dd-bg-brushes').hidden=false;panel.querySelector('.dd-bg-edit-actions').hidden=false;panel.querySelector('[data-bg-action="undo"]').disabled=true;panel.querySelector('.dd-bg-status').textContent='在图片上涂抹要擦掉的背景；支持撤销，原图不会被修改。';
+}
+async function ddFinishBgEraser(dlg){
+ const st=dlg?._ddBgEraser;if(!st)return;
+ const img=dlg.querySelector('img'),blob=await new Promise(resolve=>st.canvas.toBlob(resolve,'image/png'));
+ if(!blob){ddToast('透明图片生成失败');return;}
+ const url=URL.createObjectURL(blob);ddLastCutoutBlob=blob;document.querySelectorAll('[data-jb-image="float"]').forEach(button=>button.disabled=false);if(dlg._ddCutoutUrl)URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl=url;dlg._ddCutoutReady=true;st.canvas.remove();dlg._ddBgEraser=null;img.style.visibility='';img.src=url;
+ await new Promise(resolve=>{if(img.complete)resolve();else{img.onload=resolve;img.onerror=resolve;}});
+ dlg._ddBgTools.querySelector('.dd-bg-brushes').hidden=true;dlg._ddBgTools.querySelector('.dd-bg-edit-actions').hidden=true;ddAttachJelly(img);
+ dlg._ddBgTools.querySelector('.dd-bg-status').textContent='背景擦除完成。原图已保留；可在下方「设置」中放出桌宠。';
+ return blob;
+}
+function ddApplyAutoFloat(dlg,enabled){
+ if(!dlg)return;
+ if(!enabled){
+  const state=dlg._ddFloatState;if(!state)return;
+   if(state.sourceEl?.isConnected)state.sourceEl.style.visibility=state.sourceVisibility;
+  state.stage.style.transform='';state.stage.style.transformOrigin='';
+  state.stage.style.position='';state.stage.style.left='';state.stage.style.top='';
+  dlg.append(state.stage);if(state.bar)dlg.append(state.bar);
+  dlg._ddFloatingImg=null;state.shell.remove();dlg._ddFloatState=null;
+  if(!dlg.open&&typeof dlg.showModal==='function')dlg.showModal();
+  ddBallInto(dlg);ddAttachJelly(state.stage.querySelector('img'));dlg._ddPaintBar?.();return;
+ }
+ const stage=dlg.querySelector('.dd-stage'),bar=dlg.querySelector('.dd-jelly-bar');
+ if(!stage)return;
+ if(dlg._ddFloatState)return;
+ if(dlg._ddBgEraser){ddToast('请先完成或取消背景擦除');return;}
+ const shell=document.createElement('div');shell.className='dd-float-shell';
+ const move=document.createElement('div');move.className='dd-float-move';move.textContent='拖动摆放';
+ move.setAttribute('aria-label','拖动主体位置');
+ const back=document.createElement('button');back.type='button';back.className='dd-float-return';back.textContent='收回';
+ back.addEventListener('pointerdown',e=>e.stopPropagation());
+ back.addEventListener('click',()=>ddApplyAutoFloat(dlg,false));
+ shell.append(move,back);
+ const sourceEl=dlg._ddSourceElement;
+  const state={shell,stage,bar,sourceEl,sourceVisibility:sourceEl?.style?.visibility??'',scale:.62,left:0,top:0,baseW:0,baseH:0};
+  if(sourceEl?.isConnected&&sourceEl.tagName==='IMG')sourceEl.style.visibility='hidden';
+ dlg._ddFloatState=state;dlg._ddFloatingImg=stage.querySelector('img');
+ shell.append(stage);if(bar)shell.append(bar);document.body.append(shell);
+ if(dlg.open)dlg.close();
+ requestAnimationFrame(()=>{
+  if(dlg._ddFloatState!==state)return;
+  const r=stage.getBoundingClientRect();state.baseW=Math.max(1,r.width);state.baseH=Math.max(1,r.height);
+  const maxScale=()=>Math.max(.12,Math.min(2.4,(innerWidth-24)/state.baseW,(innerHeight-120)/state.baseH));
+  const apply=()=>{
+   state.scale=Math.max(.12,Math.min(maxScale(),state.scale));
+   const w=state.baseW*state.scale,h=state.baseH*state.scale;
+   shell.style.width=w+'px';shell.style.height=h+'px';
+   state.left=Math.max(8,Math.min(innerWidth-w-8,state.left));
+   state.top=Math.max(44,Math.min(innerHeight-h-80,state.top));
+   shell.style.left=state.left+'px';shell.style.top=state.top+'px';
+   stage.style.position='absolute';stage.style.left='0';stage.style.top='0';
+   stage.style.transformOrigin='top left';stage.style.transform='scale('+state.scale+')';
+  };
+  state.left=Math.max(8,(innerWidth-state.baseW*state.scale)/2);
+  state.top=Math.max(48,(innerHeight-state.baseH*state.scale)/2);apply();
+  let drag=null;
+  move.addEventListener('pointerdown',e=>{
+   if(e.pointerType==='mouse'&&e.button!==0)return;
+   drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:state.left,top:state.top};
+   try{move.setPointerCapture(e.pointerId);}catch{}e.preventDefault();e.stopPropagation();
+  });
+  move.addEventListener('pointermove',e=>{
+   if(!drag||drag.id!==e.pointerId)return;
+   state.left=drag.left+e.clientX-drag.x;state.top=drag.top+e.clientY-drag.y;apply();
+  });
+  const moveEnd=e=>{if(drag&&drag.id===e.pointerId)drag=null;};
+  move.addEventListener('pointerup',moveEnd);move.addEventListener('pointercancel',moveEnd);
+  ['nw','ne','sw','se'].forEach(dir=>{
+   const grip=document.createElement('button');grip.type='button';grip.className='dd-float-resize dd-resize-'+dir;
+   grip.setAttribute('aria-label','调整主体大小');grip.title='拖动调整大小';shell.append(grip);
+   let resize=null;
+   grip.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='mouse'&&e.button!==0)return;
+    resize={id:e.pointerId,x:e.clientX,y:e.clientY,scale:state.scale,left:state.left,top:state.top,width:state.baseW*state.scale,height:state.baseH*state.scale};
+    try{grip.setPointerCapture(e.pointerId);}catch{}e.preventDefault();e.stopPropagation();
+   });
+   grip.addEventListener('pointermove',e=>{
+    if(!resize||resize.id!==e.pointerId)return;
+    const dx=e.clientX-resize.x,dy=e.clientY-resize.y,sign=dir.includes('w')?-1:1,vertical=dir.includes('n')?-1:1;
+    const delta=Math.abs(dx)>Math.abs(dy)*(state.baseW/state.baseH)?dx*sign:dy*vertical*(state.baseW/state.baseH);
+    state.scale=resize.scale+delta/state.baseW;
+    const w=state.baseW*state.scale,h=state.baseH*state.scale;
+    state.left=dir.includes('w')?resize.left+resize.width-w:resize.left;
+    state.top=dir.includes('n')?resize.top+resize.height-h:resize.top;apply();
+    e.preventDefault();e.stopPropagation();
+   });
+   const end=e=>{if(resize&&resize.id===e.pointerId)resize=null;};
+   grip.addEventListener('pointerup',end);grip.addEventListener('pointercancel',end);
+  });
+  window.addEventListener('resize',()=>{if(dlg._ddFloatState===state)apply();});
+  const img=stage.querySelector('img');if(img)ddAttachJelly(img);
+  dlg._ddPaintBar?.();
+ });
+}
+function ddOpenViewer(url,sourceEl=null){
  let dlg=document.querySelector('dialog.dd-viewer');
  if(!dlg){
   dlg=document.createElement('dialog');dlg.className='dd-viewer';dlg.setAttribute('aria-label','果冻放大图');
   dlg.innerHTML='<button type="button" class="dd-close" aria-label="关闭" title="关闭"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button><div class="dd-stage"><img alt="放大查看的图片" draggable="false"></div>';
-  const bar=ddBuildBar(dlg);dlg.append(bar);
+  const bar=ddBuildBar(dlg);bar._ddOwner=dlg;
+  ddBuildBgTools(dlg);
   dlg.addEventListener('click',e=>{
    // 手指抬起后系统会补发一个 click，落在刚打开的弹窗上，会被当成点了背景而立刻关掉；打开后短时间内忽略点背景。
    if(e.target===dlg&&Date.now()-(dlg._ddOpenedAt||0)<600)return;
-   if(e.target===dlg||e.target.closest('.dd-close')){if(dlg.open)dlg.close();else dlg.removeAttribute('open');}});
-  dlg.addEventListener('close',()=>{ddBallBack();dlg.querySelector('img')?.removeAttribute('src');dlg.querySelector('img')?._ddJellyAbort?.abort();ddOnViewerClosed();});
+   if((e.target===dlg&&!dlg.classList.contains('dd-auto-float'))||e.target.closest('.dd-close')){if(dlg.open)dlg.close();else dlg.removeAttribute('open');}});
+  dlg.addEventListener('close',()=>{if(dlg._ddFloatState){ddBallBack();return;}ddSetBgEraser(dlg,false);ddBallBack();const im=dlg.querySelector('img');im?._ddJellyAbort?.abort();im?.removeAttribute('src');if(dlg._ddCutoutUrl){URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl='';}if(dlg._ddReturnedUrl){URL.revokeObjectURL(dlg._ddReturnedUrl);dlg._ddReturnedUrl='';}dlg._ddCutoutReady=false;ddOnViewerClosed();});
   document.body.append(dlg);
  }
  const img=dlg.querySelector('img');
- img.src=url;
+ dlg._ddSourceElement=sourceEl;ddLastImageUrl=url;ddLastSourceElement=sourceEl;
+ ddSetBgEraser(dlg,false);ddApplyAutoFloat(dlg,false);
+ if(dlg._ddCutoutUrl){URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl='';}
+ dlg._ddCutoutReady=false;dlg._ddOriginalUrl=url;img.style.visibility='';img.src=url;
+ const tools=dlg._ddBgTools;if(tools){tools.querySelector('.dd-bg-brushes').hidden=true;tools.querySelector('.dd-bg-edit-actions').hidden=true;tools.querySelector('.dd-bg-status').textContent='可先正常互动；需要时打开下方「设置」并选择「擦除背景」。'};
  ddJellyClearSelection(img);{const p=dlg.querySelector('.dd-jb-panel');if(p)p.hidden=true;}dlg._ddMsg?.('');
  ddAttachJelly(img);dlg._ddPaintBar?.();
  dlg._ddOpenedAt=Date.now();
  ddBallInto(dlg);
  if(!dlg.open){if(typeof dlg.showModal==='function')dlg.showModal();else{dlg.setAttribute('open','');dlg.style.position='fixed';}}
+ // 悬浮抠图只由用户手动触发，不跟随自动 duang 设置自动缩小。
 }
 // 模态弹窗会把页面其他内容压在下面，悬浮球就看不见了；弹窗打开期间把球临时搬进弹窗里，关闭后搬回 body。
 function ddBallInto(dlg){const b=document.querySelector('.dd-ball');if(b&&b.parentElement!==dlg)dlg.append(b);}
 function ddBallBack(){const b=document.querySelector('.dd-ball');if(b&&b.parentElement!==document.body)document.body.append(b);}
 function ddOnViewerClosed(){if(ddPicking)ddShowPickUi(true);}
+window.addEventListener('duangduang:pet-float-returned',e=>{const blob=e.detail?.blob,sourceUrl=e.detail?.url;if(!blob&&!sourceUrl)return;ddLastCutoutBlob=blob||null;const dlg=document.querySelector('dialog.dd-viewer');const source=dlg?._ddSourceElement||ddLastSourceElement||null;const url=blob?URL.createObjectURL(blob):sourceUrl;ddOpenViewer(url,source);const current=document.querySelector('dialog.dd-viewer');if(current&&blob)current._ddReturnedUrl=url;document.querySelectorAll('[data-jb-image="float"]').forEach(button=>button.disabled=false);});
+window.addEventListener('duangduang:pet-release-failed',e=>ddToast(e.detail?.message||'桌宠放出失败'));
 
 // ===== 取图：从页面上点中的元素里拿到可以显示的地址 =====
 function ddBgUrl(el){
@@ -513,7 +748,7 @@ function ddFlatList(root,x,y,depth=0){
 function ddFindAt(x,y,doc=document,ox=0,oy=0,depth=0){
  const list=ddFlatList(doc,x,y);
  for(const el of list){
-  if(el.closest?.('.dd-pick,.dd-ball,.dd-viewer,.dd-hl,.dd-toast'))continue;
+  if(el.closest?.('.dd-pick,.dd-ball,.dd-viewer,.dd-hl,.dd-toast,#lp-float,#lp-panel'))continue;
   const tag=el.tagName;
   if(tag==='IFRAME'){
    if(depth>=4)continue;
@@ -554,6 +789,8 @@ function ddShowPickUi(on){
  if(!ddPickUi)return;
  ddPickUi.root.style.display=on?'block':'none';
  if(!on)ddPickUi.hl.style.display='none';
+ // 只有真正处于选图界面时才拦截页面事件；查看器打开期间完全放行。
+ ddPickUi.setCapture?.(!!on);
 }
 function ddHighlight(hit){
  const hl=ddPickUi?.hl;if(!hl)return;
@@ -579,7 +816,8 @@ async function ddHandleTap(x,y){
   ddToast('识别到图片，正在打开…');
   const url=await ddSourceOf(hit);
   if(!url){ddToast('这张图抓不到（可能被浏览器保护了）');return;}
-  ddShowPickUi(false);ddOpenViewer(url);
+  ddShowPickUi(false);
+  ddLastCutoutBlob=null;ddOpenViewer(url,hit.el);document.querySelectorAll('[data-jb-image="float"]').forEach(button=>button.disabled=false);
  }catch(err){
   console.warn('[duangduang] 选图失败',err);
   ddToast('选图出错：'+((err&&err.message)||err));
@@ -589,10 +827,11 @@ function ddEnterPick(){
  if(ddPicking)return;
  ddPicking=true;document.querySelector('.dd-ball')?.classList.add('is-active');
  const root=document.createElement('div');root.className='dd-pick';
- root.innerHTML='<div class="dd-pick-hint"><span>点一张图片，把它放大来玩</span><button type="button" class="dd-pick-exit" aria-label="退出选图">✕</button></div><div class="dd-hl"></div>';
+ root.innerHTML='<div class="dd-pick-hint"><span>点一张图片，把它放大来玩</span><button type="button" class="dd-pick-upload">上传图片</button><button type="button" class="dd-pick-exit" aria-label="退出选图">✕</button></div><div class="dd-hl"></div>';
+ root.querySelector('.dd-pick-upload').addEventListener('click',()=>{ddPickLocalImage();ddExitPick();});
  const hl=root.querySelector('.dd-hl');
  let raf=0,last=null,down=null;
- const ours=e=>!!(e.target&&e.target.closest&&e.target.closest('.dd-ball,.dd-viewer,.dd-toast'));
+ const ours=e=>!!(e.target&&e.target.closest&&e.target.closest('.dd-ball,.dd-viewer,.dd-toast,.dd-pick-upload,.dd-tmp-file,#lp-float,#lp-panel'));
  const probe=e=>{last=e;if(raf)return;raf=requestAnimationFrame(()=>{raf=0;ddHighlight(ddFindAt(last.clientX,last.clientY));});};
  // 选图模式下，在 window 的捕获阶段把所有不属于拾取层、悬浮球和弹窗的点击 / 触摸全部拦下，
  // 这样即使别的元素盖在上面，酒馆原本的点击行为（比如点头像放大）也不会被触发。
@@ -615,13 +854,36 @@ function ddEnterPick(){
  const onOther=e=>{block(e);};
  const evs=[['pointermove',onMove,{capture:true}],['pointerdown',onDown,{capture:true}],['pointerup',onUp,{capture:true}]];
  for(const n of ['mousedown','mouseup','click','dblclick','auxclick','contextmenu','touchstart','touchend'])evs.push([n,onOther,{capture:true,passive:false}]);
- for(const [n,f,o] of evs)window.addEventListener(n,f,o);
- ddPickUi={root,hl,cleanup:()=>{for(const [n,f,o] of evs)window.removeEventListener(n,f,o);cancelAnimationFrame(raf);}};
+ let captureOn=false;
+ const setCapture=on=>{
+  if(captureOn===on)return;
+  captureOn=on;
+  for(const [n,fn,o] of evs){if(on)window.addEventListener(n,fn,o);else window.removeEventListener(n,fn,o);}
+ };
+ setCapture(true);
+ ddPickUi={root,hl,setCapture,cleanup:()=>{setCapture(false);cancelAnimationFrame(raf);}};
  document.body.append(root);
  document.addEventListener('keydown',ddPickKey,true);
  ddToast('选图模式已开：点一张图片');
 }
 function ddPickKey(e){if(e.key==='Escape'&&ddPicking&&!document.querySelector('dialog.dd-viewer[open]')){e.stopPropagation();ddExitPick();}}
+// 选本地图片：必须在点击手势里同步 input.click()；输入框要留在页面里直到选完或取消，手机浏览器才会真的弹出相册。
+function ddPickLocalImage(){
+ document.querySelectorAll('input.dd-tmp-file').forEach(x=>x.remove());
+ const input=document.createElement('input');input.type='file';input.accept='image/*';input.className='dd-tmp-file';
+ input.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;';
+ input.addEventListener('change',()=>{
+  const f=input.files&&input.files[0];input.remove();if(!f)return;
+  const url=URL.createObjectURL(f);
+  window.dispatchEvent(new CustomEvent('duangduang:pet-image-selected',{detail:{url}}));
+  setTimeout(()=>URL.revokeObjectURL(url),120000);
+ });
+ input.addEventListener('cancel',()=>input.remove());
+ document.body.append(input);input.click();
+}
+// 放出桌宠时，把查看器里调好的果冻互动设置一起带过去（桌宠自己的设置存在另一个命名空间里）。
+const DD_INHERIT_KEYS=['jellyOn','jellyTap','jellyDrag','jellyShake','jellyStrength','jellyBrush','jellyBurst','jellyBurstN','jellyBurstMode','jellyBurstDecay','jellyBurstPower','autoMode','autoSec','autoPower'];
+function ddInheritCfg(c){const o={};for(const k of DD_INHERIT_KEYS)if(c[k]!==undefined)o[k]=c[k];o.autoOn=!!c.autoOn&&c.autoViewer!==false;return o;}
 function ddExitPick(){
  ddPicking=false;document.querySelector('.dd-ball')?.classList.remove('is-active');
  ddPickUi?.cleanup?.();ddPickUi?.root.remove();ddPickUi=null;document.removeEventListener('keydown',ddPickKey,true);
@@ -788,7 +1050,7 @@ function ddAutoFire(power){
  if(document.hidden)return;
  const c=ddCfg();
  if(c.autoBall&&document.querySelector('.dd-ball'))try{ddBallKick?.(power);}catch{}
- if(c.autoViewer){const img=document.querySelector('dialog.dd-viewer[open] img');try{img?._ddKick?.(power);}catch{}}
+ if(c.autoViewer){const img=document.querySelector('.dd-float-shell img,dialog.dd-viewer[open] img');try{img?._ddKick?.(power);}catch{}}
 }
 function ddAutoStart(){
  clearTimeout(ddAutoTimer);ddAutoTimer=0;
@@ -833,7 +1095,7 @@ function ddMountBall(){
    const c=ddCfg();c.ballX=toRight?1:0;c.ballY=Math.max(0,Math.min(1,r.top/Math.max(1,window.innerHeight-h)));ddSave();ddPlaceBall(ball);
   }else{
    const dlg=document.querySelector('dialog.dd-viewer[open]');
-   if(dlg){dlg.close();return;}   // 弹窗开着时点悬浮球：关掉弹窗，回到选图
+   if(dlg){dlg.close();return;}
    ddPicking?ddExitPick():ddEnterPick();
   }
  };
@@ -848,25 +1110,39 @@ function ddMountSettings(){
  const c=ddCfg();
  const box=document.createElement('div');box.id='dd-settings';box.className='extension_container';
  box.innerHTML='<div class="inline-drawer"><div class="inline-drawer-toggle inline-drawer-header"><b>Duang 果冻</b><div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div></div><div class="inline-drawer-content">'
+  +'<details class="dd-setting-section"><summary><span>悬浮球</span><small>显示、外观与位置</small></summary><div class="dd-setting-section-body">'
   +'<label class="checkbox_label"><input id="dd-ball-on" type="checkbox"><span>显示悬浮球</span></label>'
   +'<label class="checkbox_label"><input id="dd-ball-shake" type="checkbox"><span>手机摇晃时悬浮球也跟着晃</span></label>'
   +'<div class="dd-set-row"><label for="dd-strength">弹性</label><select id="dd-strength" class="text_pole"><option value="soft">软糯</option><option value="mid">Q弹</option><option value="bouncy">DUANG</option></select></div>'
   +'<div class="dd-set-row"><label>悬浮球图标</label></div><div id="dd-icons" class="dd-icons"></div>'
   +'<small class="dd-note">换图标建议用<b>透明底的 PNG</b>，不然悬浮球会带着一块底色。上传的是<b>原图，不压缩</b>（保存在酒馆的用户文件里），GIF / 动图 WebP 也能动。</small>'
   +'<div class="dd-set-row"><input id="dd-icon-upload" type="button" class="menu_button" value="上传图片"><input id="dd-icon-reset" type="button" class="menu_button" value="恢复默认图标"><input id="dd-icon-file" type="file" accept="image/*" hidden></div>'
-  +'<div class="dd-set-row"><label for="dd-size">大小</label><input id="dd-size" type="range" min="28" max="200" step="2"><span id="dd-size-v"></span></div><div class="dd-set-row"><label for="dd-fixed">底部固定</label><input id="dd-fixed" type="range" min="0" max="70" step="2"><span id="dd-fixed-v"></span></div><small class="dd-note">摇晃手机时，图标下面这一段不动，只有上面摇，更像果冻。0 = 只固定最底边。</small><small id="dd-icon-msg"></small>'
-  +'<div class="dd-set-row"><label class="checkbox_label"><input id="dd-auto-on" type="checkbox"><span>自动 duang（不用手摇，自己晃）</span></label></div>'
+  +'<div class="dd-set-row"><label for="dd-size">大小</label><input id="dd-size" type="range" min="28" max="200" step="2"><span id="dd-size-v"></span></div>'
+  +'<div class="dd-set-row"><label for="dd-fixed">底部固定</label><input id="dd-fixed" type="range" min="0" max="70" step="2"><span id="dd-fixed-v"></span></div>'
+  +'<small class="dd-note">摇晃手机时，图标下面这一段不动，只有上面摇，更像果冻。0 = 只固定最底边。</small><small id="dd-icon-msg"></small>'
+  +'<div class="dd-set-row"><input id="dd-ball-reset" type="button" class="menu_button" value="重置悬浮球位置"></div>'
+  +'</div></details>'
+  +'<details class="dd-setting-section"><summary><span>自动 duang</span><small>定时或持续晃动</small></summary><div class="dd-setting-section-body">'
+  +'<div class="dd-set-row"><label class="checkbox_label"><input id="dd-auto-on" type="checkbox"><span>启用自动 duang</span></label></div>'
   +'<div id="dd-auto-box"><div class="dd-set-row"><label for="dd-auto-mode">方式</label><select id="dd-auto-mode" class="text_pole"><option value="interval">每隔一段时间晃一下</option><option value="random">随机间隔晃一下</option><option value="always">一直轻轻晃</option></select></div>'
   +'<div class="dd-set-row" id="dd-auto-sec-row"><label for="dd-auto-sec">间隔</label><input id="dd-auto-sec" type="range" min="2" max="60" step="1"><span id="dd-auto-sec-v"></span></div>'
   +'<div class="dd-set-row"><label for="dd-auto-power">力度</label><input id="dd-auto-power" type="range" min="30" max="200" step="5"><span id="dd-auto-power-v"></span></div>'
-  +'<div class="dd-set-row"><label class="checkbox_label"><input id="dd-auto-ball" type="checkbox"><span>悬浮球</span></label><label class="checkbox_label"><input id="dd-auto-viewer" type="checkbox"><span>放大后的图</span></label></div></div>'
-  +'<div class="dd-set-row"><b>点一下连晃</b><small>（在放大图下方的“交互”里打开“点一下连晃”）</small></div>'
+  +'<div class="dd-set-row"><label class="checkbox_label"><input id="dd-auto-ball" type="checkbox"><span>悬浮球</span></label><label class="checkbox_label"><input id="dd-auto-viewer" type="checkbox"><span>放大后的图</span></label></div>'
+  +'</div>'
+  +'</div></details>'
+  +'<details class="dd-setting-section"><summary><span>音效</span><small>开关与音量</small></summary><div class="dd-setting-section-body">'
+  +'<label class="checkbox_label"><input id="dd-sfx-on" type="checkbox"><span>启用音效（戳击 / 回弹 / 连续弹动）</span></label>'
+  +'<div class="dd-set-row"><label for="dd-sfx-volume">音量</label><input id="dd-sfx-volume" type="range" min="0" max="100" step="5"><span id="dd-sfx-volume-v"></span></div>'
+  +'<small class="dd-note">调整果冻互动时的音效音量。</small>'
+  +'</div></details>'
+  +'<details class="dd-setting-section"><summary><span>点一下连晃</span><small>连续动作的次数与幅度</small></summary><div class="dd-setting-section-body">'
+  +'<small class="dd-note">先在放大图下方的“交互”里打开“点一下连晃”，这里调整它的动作参数。</small>'
   +'<div class="dd-set-row"><label for="dd-burst-mode">模式</label><select id="dd-burst-mode" class="text_pole"><option value="wobble">摇晃（随机方向晃几下）</option><option value="press">点击反馈（按压回弹，重复几次）</option></select></div>'
   +'<div class="dd-set-row"><label for="dd-burst-n">次数</label><input id="dd-burst-n" type="range" min="1" max="10" step="1"><span id="dd-burst-n-v"></span></div>'
   +'<div class="dd-set-row"><label for="dd-burst-power">幅度</label><input id="dd-burst-power" type="range" min="20" max="200" step="5"><span id="dd-burst-power-v"></span></div>'
   +'<div class="dd-set-row"><label class="checkbox_label"><input id="dd-burst-decay" type="checkbox"><span>越晃越弱</span></label></div>'
-  +'<div class="dd-set-row"><input id="dd-ball-reset" type="button" class="menu_button" value="重置悬浮球位置"></div>'
-  +'<small>点悬浮球进入选图模式，再点任意一张图，就会放大到弹窗里玩果冻。范围、选区、交互（点击 / 拖动 / 摇晃）都在弹窗下方的小面板里。</small></div></div>';
+  +'</div></details>'
+  +'<small class="dd-settings-footer">点悬浮球进入选图模式，再点任意一张图，就会放大到弹窗里玩果冻。范围、选区和交互方式都在弹窗下方的小面板里。</small></div></div>'
  host.append(box);
  {const q=id=>box.querySelector(id),mode=q('#dd-burst-mode'),n=q('#dd-burst-n'),pw=q('#dd-burst-power'),dc=q('#dd-burst-decay');
   const paint=()=>{const b=ddBurstCfg();mode.value=b.mode;n.value=b.n;pw.value=Math.round(b.power*100);dc.checked=b.decay;q('#dd-burst-n-v').textContent=b.n+' 次';q('#dd-burst-power-v').textContent=Math.round(b.power*100)+'%';};
@@ -874,8 +1150,13 @@ function ddMountSettings(){
   [mode,n,pw,dc].forEach(el=>el.addEventListener('input',set));paint();}
  {const q=id=>box.querySelector(id),on=q('#dd-auto-on'),mode=q('#dd-auto-mode'),sec=q('#dd-auto-sec'),pw=q('#dd-auto-power'),ab=q('#dd-auto-ball'),av=q('#dd-auto-viewer'),b=q('#dd-auto-box'),row=q('#dd-auto-sec-row');
   const paint=()=>{const c=ddCfg();on.checked=!!c.autoOn;mode.value=['interval','random','always'].includes(c.autoMode)?c.autoMode:'interval';sec.value=c.autoSec;pw.value=Math.round(c.autoPower*100);ab.checked=c.autoBall!==false;av.checked=c.autoViewer!==false;q('#dd-auto-sec-v').textContent=c.autoSec+' 秒'+(c.autoMode==='random'?'起（随机到 2 倍）':'');q('#dd-auto-power-v').textContent=Math.round(c.autoPower*100)+'%';b.style.display=c.autoOn?'':'none';row.style.display=c.autoMode==='always'?'none':'';};
-  const set=()=>{const c=ddCfg();c.autoOn=on.checked;c.autoMode=mode.value;c.autoSec=Number(sec.value);c.autoPower=Number(pw.value)/100;c.autoBall=ab.checked;c.autoViewer=av.checked;ddSave();paint();ddAutoStart();};
+  const set=()=>{const c=ddCfg();c.autoOn=on.checked;c.autoMode=mode.value;c.autoSec=Number(sec.value);c.autoPower=Number(pw.value)/100;c.autoBall=ab.checked;c.autoViewer=av.checked;ddSave();paint();ddAutoStart();/* 悬浮抠图由放大弹窗内手动触发 */};
   [on,mode,sec,pw,ab,av].forEach(el=>el.addEventListener('input',set));paint();}
+ {const so=box.querySelector('#dd-sfx-on'),sv=box.querySelector('#dd-sfx-volume'),vv=box.querySelector('#dd-sfx-volume-v');
+  const paint=()=>{const k=ddCfg();so.checked=!!k.sfxOn;sv.value=String(Math.round(Math.max(0,Math.min(1,Number(k.sfxVolume)||0))*100));vv.textContent=sv.value+'%';};
+  const set=()=>{const k=ddCfg();k.sfxOn=so.checked;k.sfxVolume=Number(sv.value)/100;ddSave();paint();};
+  so.addEventListener('change',set);sv.addEventListener('input',set);paint();
+ }
  const on=box.querySelector('#dd-ball-on'),st=box.querySelector('#dd-strength');
  on.checked=!!c.ballOn;on.onchange=()=>{ddCfg().ballOn=on.checked;ddSave();ddMountBall();};
  st.value=['soft','bouncy'].includes(c.jellyStrength)?c.jellyStrength:'mid';st.onchange=()=>{ddCfg().jellyStrength=st.value;ddSave();};
@@ -930,13 +1211,14 @@ function ddMountSettings(){
 // 用法：window.DuangDuang?.openImage('/backgrounds/xxx.png')，返回 Promise<boolean>（true=已打开）。
 // 同源路径、data:、blob:、http(s) 地址都可以；同源图片可以用局部 / 选区 / 摇晃的全部效果。
 window.DuangDuang={
- version:'0.5.0',
+ version:'0.6.9',
  ready:true,
+ playSound(kind='tap',strength=1){ddPlaySound(kind,strength);},
  async openImage(src){
   try{
    const url=await ddMaterialize(String(src||'').trim());
    if(!url)return false;
-   ddOpenViewer(url);return true;
+   ddLastCutoutBlob=null;ddOpenViewer(url);document.querySelectorAll('[data-jb-image="float"]').forEach(button=>button.disabled=false);return true;
   }catch(err){console.warn('[duangduang] openImage 失败',err);return false;}
  },
  close(){const d=document.querySelector('dialog.dd-viewer[open]');if(d){d.close();return true;}return false;},
