@@ -635,9 +635,12 @@ function mount(){
  const fileInput=panel.querySelector('#lp-file');
  // 文件选择框必须脱离隐藏面板：移动端浏览器不会可靠地从 display:none 的祖先中打开相册。
  fileInput.removeAttribute('hidden');
- fileInput.style.cssText='position:fixed;left:-10000px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;';
+ fileInput.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;z-index:-1;';
  document.body.append(fileInput);
- window.addEventListener('duangduang:pet-upload-request',()=>fileInput?.click());
+ window.addEventListener('duangduang:pet-upload-request',()=>{
+   try{if(typeof fileInput.showPicker==='function')fileInput.showPicker();else fileInput.click();}
+   catch{fileInput.click();}
+  });
   window.addEventListener('duangduang:pet-image-selected',async e=>{
   try{const url=e.detail?.url;if(!url)throw new Error('没有取得图片');const response=await fetch(url);if(!response.ok)throw new Error('图片读取失败');const blob=await response.blob();activeGalleryId=null;gallerySave.textContent='保存到图库';await setPetImage(blob);await setTab('editor');open();toast('已载入聊天图片');}
   catch(err){toast(err.message||'载入聊天图片失败');window.dispatchEvent(new CustomEvent('duangduang:pet-pick-start'));}
