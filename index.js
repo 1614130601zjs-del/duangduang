@@ -530,7 +530,7 @@ function ddBuildBar(overlay){
 }
 
 // ===== 放大弹窗 =====
-let ddPicking=false,ddPickUi=null,ddPetPickMode=false;
+let ddPicking=false,ddPickUi=null;
 function ddToast(text){
  let t=document.querySelector('.dd-toast');if(!t){t=document.createElement('div');t.className='dd-toast';t.setAttribute('role','status');document.body.append(t);}
  t.textContent=text;t.classList.add('is-on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('is-on'),2600);
@@ -813,7 +813,6 @@ async function ddHandleTap(x,y){
   const url=await ddSourceOf(hit);
   if(!url){ddToast('这张图抓不到（可能被浏览器保护了）');return;}
   ddShowPickUi(false);
-  if(ddPetPickMode){ddPetPickMode=false;ddExitPick();window.dispatchEvent(new CustomEvent('duangduang:pet-image-selected',{detail:{url}}));return;}
   ddOpenViewer(url);
  }catch(err){
   console.warn('[duangduang] 选图失败',err);
@@ -822,7 +821,6 @@ async function ddHandleTap(x,y){
 }
 function ddEnterPick(){
  if(ddPicking)return;
- ddPetPickMode=true;
  ddPicking=true;document.querySelector('.dd-ball')?.classList.add('is-active');
  const root=document.createElement('div');root.className='dd-pick';
  root.innerHTML='<div class="dd-pick-hint"><span>点一张图片，把它放大来玩</span><button type="button" class="dd-pick-upload">上传图片</button><button type="button" class="dd-pick-exit" aria-label="退出选图">✕</button></div><div class="dd-hl"></div>';
@@ -860,7 +858,7 @@ function ddEnterPick(){
 }
 function ddPickKey(e){if(e.key==='Escape'&&ddPicking&&!document.querySelector('dialog.dd-viewer[open]')){e.stopPropagation();ddExitPick();}}
 function ddExitPick(){
- ddPicking=false;ddPetPickMode=false;document.querySelector('.dd-ball')?.classList.remove('is-active');
+ ddPicking=false;document.querySelector('.dd-ball')?.classList.remove('is-active');
  ddPickUi?.cleanup?.();ddPickUi?.root.remove();ddPickUi=null;document.removeEventListener('keydown',ddPickKey,true);
 }
 
