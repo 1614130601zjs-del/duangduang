@@ -531,28 +531,24 @@ function ddBuildBar(overlay){
 
 // ===== 放大弹窗 =====
 let ddPicking=false,ddPickUi=null;
+let ddLastImageUrl='',ddLastSourceElement=null,ddLastCutoutBlob=null;
 function ddToast(text){
  let t=document.querySelector('.dd-toast');if(!t){t=document.createElement('div');t.className='dd-toast';t.setAttribute('role','status');document.body.append(t);}
  t.textContent=text;t.classList.add('is-on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('is-on'),2600);
 }
 function ddBuildBgTools(dlg){
  const panel=document.createElement('div');panel.className='dd-bg-tools';
- panel.innerHTML='<div class="dd-bg-actions"><button type="button" data-bg-action="erase">擦除背景</button><button type="button" data-bg-action="float" disabled>放出桌宠</button><button type="button" data-bg-action="restore" hidden>恢复原图</button><button type="button" data-bg-action="return" hidden>返回大图</button></div><div class="dd-bg-brushes" hidden><label>笔刷大小 <input type="range" min="1" max="20" value="7" data-bg-size><output data-bg-size-value>7%</output></label><label>软度 <input type="range" min="0" max="100" value="65" data-bg-soft><output data-bg-soft-value>65%</output></label></div><div class="dd-bg-edit-actions" hidden><button type="button" data-bg-action="undo" disabled>撤销</button><button type="button" data-bg-action="cancel">取消</button><button type="button" data-bg-action="done">完成</button></div><small class="dd-bg-status" role="status">可先正常互动；需要时再手动擦除背景。</small>';
- const q=s=>panel.querySelector(s);
- const sync=()=>{q('[data-bg-action="float"]').disabled=!dlg._ddCutoutReady;q('[data-bg-action="restore"]').hidden=!dlg._ddCutoutReady;q('[data-bg-action="return"]').hidden=!dlg._ddFloatState;};
+ panel.innerHTML='<div class="dd-bg-brushes" hidden><label>笔刷大小 <input type="range" min="1" max="20" value="7" data-bg-size><output data-bg-size-value>7%</output></label><label>软度 <input type="range" min="0" max="100" value="65" data-bg-soft><output data-bg-soft-value>65%</output></label></div><div class="dd-bg-edit-actions" hidden><button type="button" data-bg-action="undo" disabled>撤销</button><button type="button" data-bg-action="cancel">取消</button><button type="button" data-bg-action="done">完成</button></div><small class="dd-bg-status" role="status">图片工具入口位于扩展设置的「Duang 果冻」分区。</small>';
+ const q=sel=>panel.querySelector(sel);
  panel.addEventListener('input',e=>{if(e.target.matches('[data-bg-size]'))q('[data-bg-size-value]').textContent=e.target.value+'%';if(e.target.matches('[data-bg-soft]'))q('[data-bg-soft-value]').textContent=e.target.value+'%';});
  panel.addEventListener('click',async e=>{
   const b=e.target.closest('[data-bg-action]');if(!b)return;
   const action=b.dataset.bgAction;
-  if(action==='erase'){await ddSetBgEraser(dlg,true);return;}
   if(action==='undo'){const st=dlg._ddBgEraser;if(st?.history.length){const blob=st.history.pop(),bitmap=await createImageBitmap(blob);st.ctx.clearRect(0,0,st.canvas.width,st.canvas.height);st.ctx.drawImage(bitmap,0,0);bitmap.close?.();q('[data-bg-action="undo"]').disabled=!st.history.length;}return;}
   if(action==='cancel'){ddSetBgEraser(dlg,false);q('.dd-bg-edit-actions').hidden=true;q('.dd-bg-status').textContent='已取消擦除，原图保持不变。';return;}
-  if(action==='done'){await ddFinishBgEraser(dlg);q('.dd-bg-edit-actions').hidden=true;sync();return;}
-  if(action==='float'){if(!dlg._ddCutoutReady)return;const blob=await ddFinishBgEraser(dlg);if(!blob)return;window.dispatchEvent(new CustomEvent('duangduang:pet-release-image',{detail:{blob}}));if(dlg.open)dlg.close();return;}
-  if(action==='return'){ddApplyAutoFloat(dlg,false);sync();q('.dd-bg-status').textContent='已返回大图互动。';return;}
-  if(action==='restore'){ddApplyAutoFloat(dlg,false);if(dlg._ddCutoutUrl){URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl='';}dlg._ddCutoutReady=false;const im=dlg.querySelector('img');im.src=dlg._ddOriginalUrl||im.src;im.style.visibility='';ddAttachJelly(im);sync();q('.dd-bg-status').textContent='已恢复原图，擦除结果不会覆盖原图。';}
+  if(action==='done'){await ddFinishBgEraser(dlg);q('.dd-bg-edit-actions').hidden=true;return;}
  });
- dlg._ddBgTools=panel;panel._ddSync=sync;return panel;
+ dlg._ddBgTools=panel;return panel;
 }
 async function ddSetBgEraser(dlg,enabled){
  const img=dlg?.querySelector('img'),stage=dlg?.querySelector('.dd-stage'),panel=dlg?._ddBgTools;
@@ -603,7 +599,7 @@ async function ddFinishBgEraser(dlg){
  const st=dlg?._ddBgEraser;if(!st)return;
  const img=dlg.querySelector('img'),blob=await new Promise(resolve=>st.canvas.toBlob(resolve,'image/png'));
  if(!blob){ddToast('透明图片生成失败');return;}
- const url=URL.createObjectURL(blob);if(dlg._ddCutoutUrl)URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl=url;dlg._ddCutoutReady=true;st.canvas.remove();dlg._ddBgEraser=null;img.style.visibility='';img.src=url;
+ const url=URL.createObjectURL(blob);ddLastCutoutBlob=blob;if(dlg._ddCutoutUrl)URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl=url;dlg._ddCutoutReady=true;st.canvas.remove();dlg._ddBgEraser=null;img.style.visibility='';img.src=url;
  await new Promise(resolve=>{if(img.complete)resolve();else{img.onload=resolve;img.onerror=resolve;}});
  dlg._ddBgTools.querySelector('.dd-bg-brushes').hidden=true;dlg._ddBgTools.querySelector('.dd-bg-edit-actions').hidden=true;ddAttachJelly(img);
  dlg._ddBgTools.querySelector('.dd-bg-status').textContent='背景擦除完成。原图已保留，可随时恢复；现在可以放出桌宠。';
@@ -708,7 +704,7 @@ function ddOpenViewer(url,sourceEl=null){
   document.body.append(dlg);
  }
  const img=dlg.querySelector('img');
- dlg._ddSourceElement=sourceEl;
+ dlg._ddSourceElement=sourceEl;ddLastImageUrl=url;ddLastSourceElement=sourceEl;
  ddSetBgEraser(dlg,false);ddApplyAutoFloat(dlg,false);
  if(dlg._ddCutoutUrl){URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl='';}
  dlg._ddCutoutReady=false;dlg._ddOriginalUrl=url;img.style.visibility='';img.src=url;
@@ -724,7 +720,7 @@ function ddOpenViewer(url,sourceEl=null){
 function ddBallInto(dlg){const b=document.querySelector('.dd-ball');if(b&&b.parentElement!==dlg)dlg.append(b);}
 function ddBallBack(){const b=document.querySelector('.dd-ball');if(b&&b.parentElement!==document.body)document.body.append(b);}
 function ddOnViewerClosed(){if(ddPicking)ddShowPickUi(true);}
-window.addEventListener('duangduang:pet-float-returned',e=>{const blob=e.detail?.blob;if(!blob)return;const dlg=document.querySelector('dialog.dd-viewer');const source=dlg?._ddSourceElement||null;const url=URL.createObjectURL(blob);ddOpenViewer(url,source);const current=document.querySelector('dialog.dd-viewer');if(current)current._ddReturnedUrl=url;});
+window.addEventListener('duangduang:pet-float-returned',e=>{const blob=e.detail?.blob;if(!blob)return;ddLastCutoutBlob=blob;const dlg=document.querySelector('dialog.dd-viewer');const source=dlg?._ddSourceElement||ddLastSourceElement||null;const url=URL.createObjectURL(blob);ddOpenViewer(url,source);const current=document.querySelector('dialog.dd-viewer');if(current)current._ddReturnedUrl=url;const release=document.querySelector('#dd-image-float');if(release)release.disabled=false;});
 window.addEventListener('duangduang:pet-release-failed',e=>ddToast(e.detail?.message||'桌宠放出失败'));
 
 // ===== 取图：从页面上点中的元素里拿到可以显示的地址 =====
@@ -816,7 +812,7 @@ async function ddHandleTap(x,y){
   const url=await ddSourceOf(hit);
   if(!url){ddToast('这张图抓不到（可能被浏览器保护了）');return;}
   ddShowPickUi(false);
-  ddOpenViewer(url);
+  ddLastCutoutBlob=null;ddOpenViewer(url,hit.el);
  }catch(err){
   console.warn('[duangduang] 选图失败',err);
   ddToast('选图出错：'+((err&&err.message)||err));
@@ -1111,6 +1107,10 @@ function ddMountSettings(){
   +'<div class="dd-set-row"><label for="dd-sfx-volume">音量</label><input id="dd-sfx-volume" type="range" min="0" max="100" step="5"><span id="dd-sfx-volume-v"></span></div>'
   +'<small class="dd-note">调整果冻互动时的音效音量。</small>'
   +'</div></details>'
+  +'<details class="dd-setting-section"><summary><span>图片工具</span><small>擦除背景与放出桌宠</small></summary><div class="dd-setting-section-body">'
+  +'<div class="dd-set-row dd-image-tool-actions"><button type="button" class="menu_button" id="dd-image-erase">擦除背景</button><button type="button" class="menu_button" id="dd-image-float" disabled>放出桌宠</button></div>'
+  +'<small class="dd-note" id="dd-image-tool-status">先在选图模式中选中一张图片，再从这里启动背景擦除；完成擦除后即可放出桌宠。</small>'
+  +'</div></details>'
   +'<details class="dd-setting-section"><summary><span>点一下连晃</span><small>连续动作的次数与幅度</small></summary><div class="dd-setting-section-body">'
   +'<small class="dd-note">先在放大图下方的“交互”里打开“点一下连晃”，这里调整它的动作参数。</small>'
   +'<div class="dd-set-row"><label for="dd-burst-mode">模式</label><select id="dd-burst-mode" class="text_pole"><option value="wobble">摇晃（随机方向晃几下）</option><option value="press">点击反馈（按压回弹，重复几次）</option></select></div>'
@@ -1120,6 +1120,12 @@ function ddMountSettings(){
   +'</div></details>'
   +'<small class="dd-settings-footer">点悬浮球进入选图模式，再点任意一张图，就会放大到弹窗里玩果冻。范围、选区和交互方式都在弹窗下方的小面板里。</small></div></div>'
  host.append(box);
+ {const erase=box.querySelector('#dd-image-erase'),release=box.querySelector('#dd-image-float'),status=box.querySelector('#dd-image-tool-status');
+  const paint=()=>{release.disabled=!ddLastCutoutBlob;status.textContent=ddLastImageUrl?'已记住最近选中的图片。擦除完成后，可在这里放出桌宠。':'先在选图模式中选中一张图片，再从这里启动背景擦除。';};
+  erase.addEventListener('click',async()=>{if(!ddLastImageUrl){ddToast('请先选中一张图片');return;}ddLastCutoutBlob=null;paint();ddOpenViewer(ddLastImageUrl,ddLastSourceElement);const dlg=document.querySelector('dialog.dd-viewer');await ddSetBgEraser(dlg,true);});
+  release.addEventListener('click',()=>{if(!ddLastCutoutBlob){ddToast('请先擦除背景并点击完成');return;}window.dispatchEvent(new CustomEvent('duangduang:pet-release-image',{detail:{blob:ddLastCutoutBlob}}));});
+  paint();
+ }
  {const q=id=>box.querySelector(id),mode=q('#dd-burst-mode'),n=q('#dd-burst-n'),pw=q('#dd-burst-power'),dc=q('#dd-burst-decay');
   const paint=()=>{const b=ddBurstCfg();mode.value=b.mode;n.value=b.n;pw.value=Math.round(b.power*100);dc.checked=b.decay;q('#dd-burst-n-v').textContent=b.n+' 次';q('#dd-burst-power-v').textContent=Math.round(b.power*100)+'%';};
   const set=()=>{const c=ddCfg();c.jellyBurstMode=mode.value;c.jellyBurstN=Number(n.value);c.jellyBurstPower=Number(pw.value)/100;c.jellyBurstDecay=dc.checked;ddSave();paint();};
@@ -1194,7 +1200,7 @@ window.DuangDuang={
   try{
    const url=await ddMaterialize(String(src||'').trim());
    if(!url)return false;
-   ddOpenViewer(url);return true;
+   ddLastCutoutBlob=null;ddOpenViewer(url);return true;
   }catch(err){console.warn('[duangduang] openImage 失败',err);return false;}
  },
  close(){const d=document.querySelector('dialog.dd-viewer[open]');if(d){d.close();return true;}return false;},
