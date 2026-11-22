@@ -4,7 +4,7 @@ import { extension_settings } from '/scripts/extensions.js';
 import { saveSettingsDebounced, getRequestHeaders } from '/script.js';
 
 const EXT='duangduang';
-const defaults={ballOn:true,ballX:1,ballY:.62,ballShake:true,ballIcon:'default',ballIconPicked:false,ballFixed:26,ballCustoms:[],ballSize:56,jellyOn:true,jellyScope:'local',jellyTap:false,jellyDrag:true,jellyShake:false,jellyStrength:'mid',jellyBrush:.075,jellyBurst:false,jellyBurstN:3,jellyBurstMode:'wobble',jellyBurstDecay:true,jellyBurstPower:1,sfxOn:false,sfxVolume:.45,autoOn:false,autoMode:'interval',autoSec:8,autoPower:1,autoBall:true,autoViewer:true,autoFloat:true};
+const defaults={ballOn:true,ballX:1,ballY:.62,ballShake:true,ballIcon:'default',ballIconPicked:false,ballFixed:26,ballCustoms:[],ballSize:56,jellyOn:true,jellyScope:'local',jellyTap:false,jellyDrag:true,jellyShake:false,jellyStrength:'mid',jellyBrush:.075,jellyBurst:false,jellyBurstN:3,jellyBurstMode:'wobble',jellyBurstDecay:true,jellyBurstPower:1,sfxOn:false,sfxVolume:.45,autoOn:false,autoMode:'interval',autoSec:8,autoPower:1,autoBall:true,autoViewer:true};
 function ddCfg(){
  if(!extension_settings[EXT])extension_settings[EXT]={};
  const c=extension_settings[EXT];
@@ -534,6 +534,54 @@ function ddToast(text){
  let t=document.querySelector('.dd-toast');if(!t){t=document.createElement('div');t.className='dd-toast';t.setAttribute('role','status');document.body.append(t);}
  t.textContent=text;t.classList.add('is-on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('is-on'),2600);
 }
+function ddBuildBgTools(dlg){
+ const panel=document.createElement('div');panel.className='dd-bg-tools';
+ panel.innerHTML='<div class="dd-bg-actions"><button type="button" data-bg-action="erase">擦除背景</button><button type="button" data-bg-action="float" hidden>放出悬浮主体</button><button type="button" data-bg-action="restore" hidden>恢复原图</button><button type="button" data-bg-action="return" hidden>返回大图</button></div><div class="dd-bg-brushes" hidden><label>笔刷大小 <input type="range" min="1" max="20" value="7" data-bg-size><output data-bg-size-value>7%</output></label><label>软度 <input type="range" min="0" max="100" value="65" data-bg-soft><output data-bg-soft-value>65%</output></label><div class="dd-bg-edit-actions"><button type="button" data-bg-action="undo" disabled>撤销</button><button type="button" data-bg-action="cancel">取消</button><button type="button" data-bg-action="done">完成</button></div></div><small class="dd-bg-status" role="status">可先正常互动；需要时再手动擦除背景。</small>';
+ const q=s=>panel.querySelector(s);
+ const sync=()=>{q('[data-bg-action="float"]').hidden=!dlg._ddCutoutReady;q('[data-bg-action="restore"]').hidden=!dlg._ddCutoutReady;q('[data-bg-action="return"]').hidden=!dlg.classList.contains('dd-auto-float');};
+ panel.addEventListener('input',e=>{if(e.target.matches('[data-bg-size]'))q('[data-bg-size-value]').textContent=e.target.value+'%';if(e.target.matches('[data-bg-soft]'))q('[data-bg-soft-value]').textContent=e.target.value+'%';});
+ panel.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-bg-action]');if(!b)return;
+  const action=b.dataset.bgAction;
+  if(action==='erase'){await ddSetBgEraser(dlg,true);return;}
+  if(action==='undo'){const st=dlg._ddBgEraser;if(st?.history.length){st.ctx.putImageData(st.history.pop(),0,0);q('[data-bg-action="undo"]').disabled=!st.history.length;}return;}
+  if(action==='cancel'){ddSetBgEraser(dlg,false);q('.dd-bg-status').textContent='已取消擦除，原图保持不变。';return;}
+  if(action==='done'){await ddFinishBgEraser(dlg);sync();return;}
+  if(action==='float'){if(!dlg._ddCutoutReady)return;ddApplyAutoFloat(dlg,true);sync();q('.dd-bg-status').textContent='主体已放出；拖动上方把手调整位置，戳击和自动 duang 仍可使用。';return;}
+  if(action==='return'){ddApplyAutoFloat(dlg,false);sync();q('.dd-bg-status').textContent='已返回大图互动。';return;}
+  if(action==='restore'){if(dlg._ddCutoutUrl){URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl='';}dlg._ddCutoutReady=false;const im=dlg.querySelector('img');im.src=dlg._ddOriginalUrl||im.src;im.style.visibility='';ddAttachJelly(im);sync();q('.dd-bg-status').textContent='已恢复原图，擦除结果不会覆盖原图。';}
+ });
+ dlg._ddBgTools=panel;panel._ddSync=sync;return panel;
+}
+async function ddSetBgEraser(dlg,enabled){
+ const img=dlg?.querySelector('img'),stage=dlg?.querySelector('.dd-stage'),panel=dlg?._ddBgTools;
+ if(!img||!stage||!panel)return;
+ if(!enabled){const st=dlg._ddBgEraser;if(st){st.canvas.remove();img.style.visibility='';dlg._ddBgEraser=null;ddAttachJelly(img);}panel.querySelector('.dd-bg-brushes').hidden=true;return;}
+ if(dlg.classList.contains('dd-auto-float'))ddApplyAutoFloat(dlg,false);
+ if(dlg._ddBgEraser)return;
+ try{if(!img.complete)await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error('图片载入失败'));});}catch{ddToast('图片载入失败，暂时无法擦除');return;}
+ if(!img.naturalWidth||!img.naturalHeight){ddToast('这张图片暂时无法编辑');return;}
+ img._ddJellyAbort?.abort();
+ const canvas=document.createElement('canvas');canvas.className='dd-bg-eraser-canvas';canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
+ const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0);stage.append(canvas);img.style.visibility='hidden';
+ const st={canvas,ctx,history:[],pointer:null};dlg._ddBgEraser=st;
+ const point=e=>{const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)/Math.max(1,r.width)*canvas.width,y:(e.clientY-r.top)/Math.max(1,r.height)*canvas.height};};
+ const stamp=p=>{const radius=Math.max(1,Math.min(canvas.width,canvas.height)*Number(panel.querySelector('[data-bg-size]').value||7)/200),softness=Number(panel.querySelector('[data-bg-soft]').value||65);ctx.save();ctx.globalCompositeOperation='destination-out';if(softness<=0){ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();}else{const inner=radius*(1-softness/100),g=ctx.createRadialGradient(p.x,p.y,inner,p.x,p.y,radius);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();}ctx.restore();};
+ const line=(a,b)=>{const radius=Math.max(1,Math.min(canvas.width,canvas.height)*Number(panel.querySelector('[data-bg-size]').value||7)/200),dist=Math.hypot(b.x-a.x,b.y-a.y),steps=Math.max(1,Math.ceil(dist/Math.max(1,radius*.22)));for(let i=1;i<=steps;i++){const t=i/steps;stamp({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});}};
+ canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'&&e.button!==0)return;e.preventDefault();try{canvas.setPointerCapture(e.pointerId);}catch{}st.history.push(ctx.getImageData(0,0,canvas.width,canvas.height));if(st.history.length>8)st.history.shift();st.pointer={id:e.pointerId,last:point(e)};stamp(st.pointer.last);panel.querySelector('[data-bg-action="undo"]').disabled=false;});
+ canvas.addEventListener('pointermove',e=>{if(!st.pointer||st.pointer.id!==e.pointerId)return;e.preventDefault();const p=point(e);line(st.pointer.last,p);st.pointer.last=p;});
+ const end=e=>{if(st.pointer&&(!e||st.pointer.id===e.pointerId))st.pointer=null;};canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);
+ panel.querySelector('.dd-bg-brushes').hidden=false;panel.querySelector('[data-bg-action="undo"]').disabled=true;panel.querySelector('.dd-bg-status').textContent='在图片上涂抹要擦掉的背景；支持撤销，原图不会被修改。';
+}
+async function ddFinishBgEraser(dlg){
+ const st=dlg?._ddBgEraser;if(!st)return;
+ const img=dlg.querySelector('img'),blob=await new Promise(resolve=>st.canvas.toBlob(resolve,'image/png'));
+ if(!blob){ddToast('透明图片生成失败');return;}
+ const url=URL.createObjectURL(blob);dlg._ddCutoutUrl=url;dlg._ddCutoutReady=true;st.canvas.remove();dlg._ddBgEraser=null;img.style.visibility='';img.src=url;
+ await new Promise(resolve=>{if(img.complete)resolve();else{img.onload=resolve;img.onerror=resolve;}});
+ dlg._ddBgTools.querySelector('.dd-bg-brushes').hidden=true;ddAttachJelly(img);
+ dlg._ddBgTools.querySelector('.dd-bg-status').textContent='背景擦除完成。原图已保留，可随时恢复；现在可以放出悬浮主体。';
+}
 function ddApplyAutoFloat(dlg,enabled){
  if(!dlg)return;
  const stage=dlg.querySelector('.dd-stage');if(!stage)return;
@@ -566,22 +614,26 @@ function ddOpenViewer(url){
  if(!dlg){
   dlg=document.createElement('dialog');dlg.className='dd-viewer';dlg.setAttribute('aria-label','果冻放大图');
   dlg.innerHTML='<button type="button" class="dd-close" aria-label="关闭" title="关闭"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button><div class="dd-stage"><img alt="放大查看的图片" draggable="false"></div>';
+  const tools=ddBuildBgTools(dlg);dlg.append(tools);
   const bar=ddBuildBar(dlg);dlg.append(bar);
   dlg.addEventListener('click',e=>{
    // 手指抬起后系统会补发一个 click，落在刚打开的弹窗上，会被当成点了背景而立刻关掉；打开后短时间内忽略点背景。
    if(e.target===dlg&&Date.now()-(dlg._ddOpenedAt||0)<600)return;
    if((e.target===dlg&&!dlg.classList.contains('dd-auto-float'))||e.target.closest('.dd-close')){if(dlg.open)dlg.close();else dlg.removeAttribute('open');}});
-  dlg.addEventListener('close',()=>{ddApplyAutoFloat(dlg,false);ddBallBack();dlg.querySelector('img')?.removeAttribute('src');dlg.querySelector('img')?._ddJellyAbort?.abort();ddOnViewerClosed();});
+  dlg.addEventListener('close',()=>{ddSetBgEraser(dlg,false);ddApplyAutoFloat(dlg,false);ddBallBack();const im=dlg.querySelector('img');im?._ddJellyAbort?.abort();im?.removeAttribute('src');if(dlg._ddCutoutUrl){URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl='';}dlg._ddCutoutReady=false;ddOnViewerClosed();});
   document.body.append(dlg);
  }
  const img=dlg.querySelector('img');
- img.src=url;
+ ddSetBgEraser(dlg,false);ddApplyAutoFloat(dlg,false);
+ if(dlg._ddCutoutUrl){URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl='';}
+ dlg._ddCutoutReady=false;dlg._ddOriginalUrl=url;img.style.visibility='';img.src=url;
+ const tools=dlg._ddBgTools;if(tools){tools.querySelectorAll('[data-bg-action]').forEach(b=>b.hidden=!['erase'].includes(b.dataset.bgAction));tools.querySelector('.dd-bg-brushes').hidden=true;tools.querySelector('.dd-bg-status').textContent='可先正常互动；需要时再手动擦除背景。'};
  ddJellyClearSelection(img);{const p=dlg.querySelector('.dd-jb-panel');if(p)p.hidden=true;}dlg._ddMsg?.('');
  ddAttachJelly(img);dlg._ddPaintBar?.();
  dlg._ddOpenedAt=Date.now();
  ddBallInto(dlg);
  if(!dlg.open){if(typeof dlg.showModal==='function')dlg.showModal();else{dlg.setAttribute('open','');dlg.style.position='fixed';}}
- ddApplyAutoFloat(dlg,ddCfg().autoOn===true&&ddCfg().autoFloat!==false&&ddCfg().autoViewer!==false);
+ // 悬浮抠图只由用户手动触发，不跟随自动 duang 设置自动缩小。
 }
 // 模态弹窗会把页面其他内容压在下面，悬浮球就看不见了；弹窗打开期间把球临时搬进弹窗里，关闭后搬回 body。
 function ddBallInto(dlg){const b=document.querySelector('.dd-ball');if(b&&b.parentElement!==dlg)dlg.append(b);}
@@ -963,7 +1015,7 @@ function ddMountSettings(){
   +'<div class="dd-set-row" id="dd-auto-sec-row"><label for="dd-auto-sec">间隔</label><input id="dd-auto-sec" type="range" min="2" max="60" step="1"><span id="dd-auto-sec-v"></span></div>'
   +'<div class="dd-set-row"><label for="dd-auto-power">力度</label><input id="dd-auto-power" type="range" min="30" max="200" step="5"><span id="dd-auto-power-v"></span></div>'
   +'<div class="dd-set-row"><label class="checkbox_label"><input id="dd-auto-ball" type="checkbox"><span>悬浮球</span></label><label class="checkbox_label"><input id="dd-auto-viewer" type="checkbox"><span>放大后的图</span></label></div>'
-  +'<div class="dd-set-row"><label class="checkbox_label"><input id="dd-auto-float" type="checkbox"><span>缩小画面并自由拖动摆放</span></label></div><small class="dd-note">开启后，放大图会变成小悬浮画面，可拖动顶部把手放到屏幕任意位置，再由自动 duang 驱动。</small></div>'
+  +'</div>'
   +'</div></details>'
   +'<details class="dd-setting-section"><summary><span>音效</span><small>开关与音量</small></summary><div class="dd-setting-section-body">'
   +'<label class="checkbox_label"><input id="dd-sfx-on" type="checkbox"><span>启用音效（戳击 / 回弹 / 连续弹动）</span></label>'
@@ -983,10 +1035,10 @@ function ddMountSettings(){
   const paint=()=>{const b=ddBurstCfg();mode.value=b.mode;n.value=b.n;pw.value=Math.round(b.power*100);dc.checked=b.decay;q('#dd-burst-n-v').textContent=b.n+' 次';q('#dd-burst-power-v').textContent=Math.round(b.power*100)+'%';};
   const set=()=>{const c=ddCfg();c.jellyBurstMode=mode.value;c.jellyBurstN=Number(n.value);c.jellyBurstPower=Number(pw.value)/100;c.jellyBurstDecay=dc.checked;ddSave();paint();};
   [mode,n,pw,dc].forEach(el=>el.addEventListener('input',set));paint();}
- {const q=id=>box.querySelector(id),on=q('#dd-auto-on'),mode=q('#dd-auto-mode'),sec=q('#dd-auto-sec'),pw=q('#dd-auto-power'),ab=q('#dd-auto-ball'),av=q('#dd-auto-viewer'),af=q('#dd-auto-float'),b=q('#dd-auto-box'),row=q('#dd-auto-sec-row');
-  const paint=()=>{const c=ddCfg();on.checked=!!c.autoOn;mode.value=['interval','random','always'].includes(c.autoMode)?c.autoMode:'interval';sec.value=c.autoSec;pw.value=Math.round(c.autoPower*100);ab.checked=c.autoBall!==false;av.checked=c.autoViewer!==false;af.checked=c.autoFloat!==false;q('#dd-auto-sec-v').textContent=c.autoSec+' 秒'+(c.autoMode==='random'?'起（随机到 2 倍）':'');q('#dd-auto-power-v').textContent=Math.round(c.autoPower*100)+'%';b.style.display=c.autoOn?'':'none';row.style.display=c.autoMode==='always'?'none':'';};
-  const set=()=>{const c=ddCfg();c.autoOn=on.checked;c.autoMode=mode.value;c.autoSec=Number(sec.value);c.autoPower=Number(pw.value)/100;c.autoBall=ab.checked;c.autoViewer=av.checked;c.autoFloat=af.checked;ddSave();paint();ddAutoStart();const dlg=document.querySelector('dialog.dd-viewer[open]');if(dlg)ddApplyAutoFloat(dlg,c.autoOn&&c.autoFloat&&c.autoViewer);};
-  [on,mode,sec,pw,ab,av,af].forEach(el=>el.addEventListener('input',set));paint();}
+ {const q=id=>box.querySelector(id),on=q('#dd-auto-on'),mode=q('#dd-auto-mode'),sec=q('#dd-auto-sec'),pw=q('#dd-auto-power'),ab=q('#dd-auto-ball'),av=q('#dd-auto-viewer'),b=q('#dd-auto-box'),row=q('#dd-auto-sec-row');
+  const paint=()=>{const c=ddCfg();on.checked=!!c.autoOn;mode.value=['interval','random','always'].includes(c.autoMode)?c.autoMode:'interval';sec.value=c.autoSec;pw.value=Math.round(c.autoPower*100);ab.checked=c.autoBall!==false;av.checked=c.autoViewer!==false;q('#dd-auto-sec-v').textContent=c.autoSec+' 秒'+(c.autoMode==='random'?'起（随机到 2 倍）':'');q('#dd-auto-power-v').textContent=Math.round(c.autoPower*100)+'%';b.style.display=c.autoOn?'':'none';row.style.display=c.autoMode==='always'?'none':'';};
+  const set=()=>{const c=ddCfg();c.autoOn=on.checked;c.autoMode=mode.value;c.autoSec=Number(sec.value);c.autoPower=Number(pw.value)/100;c.autoBall=ab.checked;c.autoViewer=av.checked;ddSave();paint();ddAutoStart();/* 悬浮抠图由放大弹窗内手动触发 */};
+  [on,mode,sec,pw,ab,av].forEach(el=>el.addEventListener('input',set));paint();}
  {const so=box.querySelector('#dd-sfx-on'),sv=box.querySelector('#dd-sfx-volume'),vv=box.querySelector('#dd-sfx-volume-v');
   const paint=()=>{const k=ddCfg();so.checked=!!k.sfxOn;sv.value=String(Math.round(Math.max(0,Math.min(1,Number(k.sfxVolume)||0))*100));vv.textContent=sv.value+'%';};
   const set=()=>{const k=ddCfg();k.sfxOn=so.checked;k.sfxVolume=Number(sv.value)/100;ddSave();paint();};

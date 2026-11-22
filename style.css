@@ -161,3 +161,26 @@ dialog.dd-viewer.dd-auto-float .dd-close{position:fixed;top:10px;right:10px;z-in
 dialog.dd-viewer.dd-auto-float .dd-jelly-bar{position:fixed;left:50%;top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);transform:translateX(-50%);margin:0;max-width:calc(100vw - 16px)}
 
 dialog.dd-viewer.dd-auto-float::backdrop{background:transparent;backdrop-filter:none}
+
+/* 手动擦除背景与悬浮主体：默认不缩小，只有用户完成抠图后手动放出 */
+dialog.dd-viewer .dd-stage{position:relative}
+dialog.dd-viewer .dd-bg-eraser-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:12;touch-action:none;cursor:crosshair}
+dialog.dd-viewer .dd-bg-tools{display:flex;flex-direction:column;gap:7px;margin:9px auto 0;max-width:min(520px,calc(100vw - 24px));font-size:12px}
+dialog.dd-viewer .dd-bg-actions,.dd-bg-edit-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:6px}
+dialog.dd-viewer .dd-bg-tools button{all:unset;box-sizing:border-box;padding:6px 12px;border:1px solid var(--dd-border);border-radius:999px;color:var(--dd-text);background:color-mix(in srgb,var(--dd-bg) 92%,transparent);font-size:12px;line-height:1.35;cursor:pointer;text-align:center}
+dialog.dd-viewer .dd-bg-tools button[hidden],dialog.dd-viewer .dd-bg-brushes[hidden]{display:none}
+dialog.dd-viewer .dd-bg-tools button:disabled{opacity:.4}
+dialog.dd-viewer .dd-bg-brushes{display:flex;flex-direction:column;gap:6px;padding:8px 10px;border:1px solid var(--dd-border);border-radius:12px;background:color-mix(in srgb,var(--dd-bg) 96%,transparent)}
+dialog.dd-viewer .dd-bg-brushes label{display:flex;align-items:center;gap:8px}
+dialog.dd-viewer .dd-bg-brushes input{flex:1;min-width:80px;accent-color:var(--dd-accent)}
+dialog.dd-viewer .dd-bg-brushes output{width:42px;text-align:right}
+dialog.dd-viewer .dd-bg-status{display:block;text-align:center;color:var(--dd-muted);font-size:11px;line-height:1.4}
+dialog.dd-viewer.dd-auto-float{box-sizing:border-box;width:100vw;height:100dvh;max-width:none;max-height:none;inset:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;overflow:hidden}
+dialog.dd-viewer.dd-auto-float .dd-stage{position:absolute;display:block;width:max-content;max-width:calc(100vw - 24px);padding:0;touch-action:pan-y}
+dialog.dd-viewer.dd-auto-float .dd-stage>img{max-width:min(42vw,280px);max-height:34dvh;width:auto;height:auto;object-fit:contain;box-shadow:0 8px 28px #0005}
+dialog.dd-viewer.dd-auto-float .dd-auto-float-handle{position:absolute;left:50%;top:-30px;transform:translateX(-50%);padding:5px 13px;border:1px solid var(--dd-border);border-radius:999px;background:var(--dd-bg);color:var(--dd-text);font:inherit;font-size:11px;line-height:1.2;white-space:nowrap;touch-action:none;cursor:grab;box-shadow:0 3px 12px #0003}
+dialog.dd-viewer.dd-auto-float .dd-close{position:fixed;top:10px;right:10px;z-index:20}
+dialog.dd-viewer.dd-auto-float .dd-jelly-bar{position:fixed;left:50%;top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);transform:translateX(-50%);margin:0;max-width:calc(100vw - 16px)}
+dialog.dd-viewer.dd-auto-float .dd-bg-tools{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 66px);transform:translateX(-50%);width:max-content;max-width:calc(100vw - 24px);margin:0}
+dialog.dd-viewer.dd-auto-float .dd-bg-tools .dd-bg-brushes{display:none!important}
+dialog.dd-viewer.dd-auto-float::backdrop{background:transparent;backdrop-filter:none}
