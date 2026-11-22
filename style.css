@@ -316,3 +316,23 @@ dialog.dd-viewer.dd-auto-float .dd-bg-tools{
  position:absolute;left:50%;top:calc(100% + 8px);bottom:auto;
  transform:translateX(-50%);margin:0;max-width:calc(100vw - 20px);
 }
+
+
+/* 修正擦除控制区与图片重叠：普通大图模式下工具栏回到图片流布局 */
+dialog.dd-viewer:not(.dd-auto-float) .dd-bg-tools{
+ position:relative!important;
+ z-index:20;
+ left:auto!important;
+ bottom:auto!important;
+ transform:none!important;
+ width:max-content;
+ max-width:calc(100vw - 20px);
+ margin:12px auto 0!important;
+}
+dialog.dd-viewer:not(.dd-auto-float) .dd-bg-tools .dd-bg-actions,
+dialog.dd-viewer:not(.dd-auto-float) .dd-bg-tools .dd-bg-edit-actions{
+ justify-content:center;
+}
+dialog.dd-viewer:not(.dd-auto-float) .dd-bg-tools .dd-bg-brushes{
+ position:relative;
+}
