@@ -166,7 +166,7 @@ dialog.dd-viewer.dd-auto-float::backdrop{background:transparent;backdrop-filter:
 
 /* 手动擦除背景与悬浮主体：默认不缩小，只有用户完成抠图后手动放出 */
 dialog.dd-viewer .dd-stage{position:relative}
-dialog.dd-viewer .dd-bg-eraser-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:12;touch-action:none;cursor:crosshair}
+dialog.dd-viewer .dd-bg-eraser-canvas{position:absolute;inset:auto;box-sizing:border-box;z-index:12;touch-action:none;cursor:crosshair}
 dialog.dd-viewer .dd-bg-tools{display:flex;flex-direction:column;gap:7px;margin:9px auto 0;max-width:min(520px,calc(100vw - 24px));font-size:12px}
 dialog.dd-viewer .dd-bg-actions,.dd-bg-edit-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:6px}
 dialog.dd-viewer .dd-bg-tools button{all:unset;box-sizing:border-box;padding:6px 12px;border:1px solid var(--dd-border);border-radius:999px;color:var(--dd-text);background:color-mix(in srgb,var(--dd-bg) 92%,transparent);font-size:12px;line-height:1.35;cursor:pointer;text-align:center}
