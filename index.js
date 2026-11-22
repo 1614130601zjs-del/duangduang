@@ -602,7 +602,7 @@ async function ddFinishBgEraser(dlg){
  const url=URL.createObjectURL(blob);ddLastCutoutBlob=blob;const releaseButton=document.querySelector('#dd-image-float');if(releaseButton)releaseButton.disabled=false;if(dlg._ddCutoutUrl)URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl=url;dlg._ddCutoutReady=true;st.canvas.remove();dlg._ddBgEraser=null;img.style.visibility='';img.src=url;
  await new Promise(resolve=>{if(img.complete)resolve();else{img.onload=resolve;img.onerror=resolve;}});
  dlg._ddBgTools.querySelector('.dd-bg-brushes').hidden=true;dlg._ddBgTools.querySelector('.dd-bg-edit-actions').hidden=true;ddAttachJelly(img);
- dlg._ddBgTools.querySelector('.dd-bg-status').textContent='背景擦除完成。原图已保留，可随时恢复；现在可以放出桌宠。';
+ dlg._ddBgTools.querySelector('.dd-bg-status').textContent='背景擦除完成。原图已保留；可到扩展设置的「图片工具」放出桌宠。';
  return blob;
 }
 function ddApplyAutoFloat(dlg,enabled){
@@ -708,7 +708,7 @@ function ddOpenViewer(url,sourceEl=null){
  ddSetBgEraser(dlg,false);ddApplyAutoFloat(dlg,false);
  if(dlg._ddCutoutUrl){URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl='';}
  dlg._ddCutoutReady=false;dlg._ddOriginalUrl=url;img.style.visibility='';img.src=url;
- const tools=dlg._ddBgTools;if(tools){tools.querySelectorAll('[data-bg-action]').forEach(b=>{b.hidden=['restore','return'].includes(b.dataset.bgAction);});tools.querySelector('[data-bg-action="float"]').disabled=true;tools.querySelector('.dd-bg-brushes').hidden=true;tools.querySelector('.dd-bg-edit-actions').hidden=true;tools.querySelector('.dd-bg-status').textContent='可先正常互动；需要时再手动擦除背景。'};
+ const tools=dlg._ddBgTools;if(tools){tools.querySelector('.dd-bg-brushes').hidden=true;tools.querySelector('.dd-bg-edit-actions').hidden=true;tools.querySelector('.dd-bg-status').textContent='可先正常互动；需要时从扩展设置的「图片工具」启动背景擦除。'};
  ddJellyClearSelection(img);{const p=dlg.querySelector('.dd-jb-panel');if(p)p.hidden=true;}dlg._ddMsg?.('');
  ddAttachJelly(img);dlg._ddPaintBar?.();
  dlg._ddOpenedAt=Date.now();
