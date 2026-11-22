@@ -83,3 +83,70 @@ dialog.dd-viewer .dd-jelly-bar .dd-jb-panel.is-dd-open{padding-bottom:118px}
 #dd-settings .dd-icon-opt{position:relative}
 #dd-settings .dd-icon-opt.is-on{border-color:var(--dd-accent);background:color-mix(in srgb,var(--dd-accent) 16%,transparent);box-shadow:0 0 0 2px color-mix(in srgb,var(--dd-accent) 35%,transparent)}
 #dd-settings .dd-icon-opt.is-on::after{content:"✓";position:absolute;right:-5px;bottom:-5px;width:16px;height:16px;border-radius:50%;background:var(--dd-accent);color:#fff;font-size:11px;line-height:16px;text-align:center;font-weight:700}
+
+
+/* 设置页：分区手风琴布局 */
+#dd-settings .dd-setting-section{
+ margin:10px 0;
+ border:1px solid var(--dd-border);
+ border-radius:10px;
+ overflow:hidden;
+ background:color-mix(in srgb,var(--dd-bg) 42%,transparent);
+}
+#dd-settings .dd-setting-section>summary{
+ display:flex;
+ align-items:center;
+ gap:8px;
+ min-height:42px;
+ padding:9px 12px;
+ cursor:pointer;
+ list-style:none;
+ font-weight:600;
+ -webkit-tap-highlight-color:transparent;
+}
+#dd-settings .dd-setting-section>summary::-webkit-details-marker{display:none}
+#dd-settings .dd-setting-section>summary::after{
+ content:"";
+ width:8px;height:8px;
+ margin-left:auto;
+ flex:0 0 8px;
+ border-right:2px solid var(--dd-muted);
+ border-bottom:2px solid var(--dd-muted);
+ transform:rotate(45deg) translateY(-2px);
+ transition:transform .18s ease;
+}
+#dd-settings .dd-setting-section[open]>summary{
+ border-bottom:1px solid var(--dd-border);
+ background:color-mix(in srgb,var(--dd-accent) 9%,transparent);
+}
+#dd-settings .dd-setting-section[open]>summary::after{transform:rotate(225deg) translate(-1px,-1px)}
+#dd-settings .dd-setting-section>summary>span{font-size:14px}
+#dd-settings .dd-setting-section>summary>small{
+ display:inline;
+ margin:0 0 0 2px;
+ opacity:.62;
+ font-size:11px;
+ font-weight:400;
+}
+#dd-settings .dd-setting-section-body{
+ display:flex;
+ flex-direction:column;
+ gap:8px;
+ padding:12px;
+}
+#dd-settings .dd-setting-section-body>.dd-set-row{margin:0;min-height:34px}
+#dd-settings .dd-setting-section-body>.checkbox_label{display:flex;align-items:center;min-height:34px;margin:0}
+#dd-settings .dd-setting-section-body .dd-note{margin:0 0 2px}
+#dd-settings .dd-setting-section-body .dd-icons{margin:2px 0}
+#dd-settings .dd-setting-section-body .dd-set-row>label:not(.checkbox_label){min-width:76px}
+#dd-settings .dd-setting-section-body .dd-set-row>input[type=range]{flex:1;min-width:70px;accent-color:var(--dd-accent)}
+#dd-settings .dd-setting-section-body .dd-set-row>select{flex:1;min-width:0}
+#dd-settings .dd-setting-section-body .dd-set-row>span{min-width:42px;text-align:right;font-size:12px;color:var(--dd-muted)}
+#dd-settings .dd-settings-footer{display:block;opacity:.65;margin:12px 2px 4px;line-height:1.55}
+@media(max-width:480px){
+ #dd-settings .dd-setting-section>summary{padding:10px}
+ #dd-settings .dd-setting-section>summary>small{font-size:10px}
+ #dd-settings .dd-setting-section-body{padding:10px;gap:9px}
+ #dd-settings .dd-setting-section-body .dd-set-row>label:not(.checkbox_label){min-width:66px}
+ #dd-settings .dd-setting-section-body .dd-set-row>input[type=button]{font-size:12px;padding-inline:8px}
+}
