@@ -544,8 +544,12 @@ function toast(t){const el=document.querySelector('#lp-toast');if(!el)return;el.
 function detachPet(){if(petImage)petImage._ddJellyAbort?.abort();if(petFloat)petFloat.remove();petFloat=null;petFloatState=null;petRoot?.remove();petRoot=null;petImage=null;}
 function restoreMask(img){return dbGet('pet-mask').then(saved=>{const S=ddJellyState(img);if(saved&&Array.isArray(saved.mask)&&saved.mask.length===S.mask.length){S.mask.set(saved.mask);S.has=!!saved.has;}else{S.mask.fill(0);S.has=false;}ddAttachJelly(img);});}
 function makePetRoot(){const root=document.createElement('div');root.className='lp-interaction';root.innerHTML='<div class="lp-image-host"><img alt="小小桌宠" draggable="false"></div>';const img=root.querySelector('img');return {root,img};}
-async function setPetImage(blob){
- if(!blob)return;if(petEraser)await ddSetEraser(false);detachPet();petBlob=blob;petEraserHistory=[];await dbPut('pet-image',blob);if(petUrl)URL.revokeObjectURL(petUrl);petUrl=URL.createObjectURL(blob);
+async function setPetImage(source){
+ if(!source)return;if(petEraser)await ddSetEraser(false);detachPet();
+ petBlob=source instanceof Blob?source:null;petEraserHistory=[];
+ if(petBlob)await dbPut('pet-image',petBlob);
+ if(petUrl&&petUrl.startsWith('blob:'))URL.revokeObjectURL(petUrl);
+ petUrl=petBlob?URL.createObjectURL(petBlob):String(source);
  const made=makePetRoot();petRoot=made.root;petImage=made.img;const stage=document.querySelector('#lp-stage');if(!stage)throw new Error('编辑区域尚未加载');let empty=stage.querySelector('#lp-empty');if(!empty){empty=document.createElement('div');empty.id='lp-empty';empty.className='lp-empty';empty.innerHTML='<b>放一张图片进来</b><small>支持 PNG、WebP、JPG，建议透明背景立绘</small><button id="lp-upload" type="button">选择图片</button>';empty.querySelector('#lp-upload').addEventListener('click',()=>document.querySelector('#lp-file')?.click());}stage.replaceChildren(empty,petRoot);empty.hidden=true;
  await new Promise((resolve,reject)=>{petImage.onload=resolve;petImage.onerror=()=>reject(new Error('图片载入失败'));petImage.src=petUrl;});
  const jellySlot=document.querySelector('#lp-jelly-slot');if(jellySlot)jellySlot.replaceChildren();
@@ -651,7 +655,7 @@ function mount(){
  // 将操作面板直接挂到 body，脱离酒馆可能带有 transform 的扩展容器，避免 fixed 定位偏移。
  document.body.append(panel);
  const rememberFloatState=f=>{if(!f)return;const r=f.getBoundingClientRect();petFloatState={left:r.left,top:r.top,width:r.width,height:r.height,scale:f._lpCurrentScale||1};};
- const returnPetToEditor=()=>{if(!petFloat||!petRoot)return false;rememberFloatState(petFloat);petFloat.remove();petFloat=null;petRoot.style.transform='';petRoot.style.transformOrigin='';panel.querySelector('#lp-stage').append(petRoot);petImage._ddJellyRehost?.();ddAttachJelly(petImage);petImage._ddJellyPrepare?.();petRoot._ddPaintBar?.();if(petExternalMode){petExternalMode=false;window.dispatchEvent(new CustomEvent('duangduang:pet-float-returned',{detail:{blob:petBlob}}));return 'external';}return true;};
+ const returnPetToEditor=()=>{if(!petFloat||!petRoot)return false;rememberFloatState(petFloat);petFloat.remove();petFloat=null;petRoot.style.transform='';petRoot.style.transformOrigin='';panel.querySelector('#lp-stage').append(petRoot);petImage._ddJellyRehost?.();ddAttachJelly(petImage);petImage._ddJellyPrepare?.();petRoot._ddPaintBar?.();if(petExternalMode){petExternalMode=false;window.dispatchEvent(new CustomEvent('duangduang:pet-float-returned',{detail:{blob:petBlob,url:petBlob?undefined:petUrl}}));return 'external';}return true;};
  const open=()=>{if(petFloat&&returnPetToEditor()==='external')return;panel.classList.add('is-open');panel.setAttribute('aria-hidden','false');requestAnimationFrame(()=>{if(!petImage)return;petImage._ddJellyRehost?.();ddAttachJelly(petImage);petImage._ddJellyPrepare?.();});};
  const close=()=>{if(petEraser)ddSetEraser(false);panel.classList.remove('is-open');panel.setAttribute('aria-hidden','true');};
  const injectWandButton=()=>{
@@ -755,7 +759,7 @@ function mount(){
   });
   close();
  });
- window.addEventListener('duangduang:pet-release-image',async e=>{const blob=e.detail?.blob;if(!blob)return;try{await setPetImage(blob);petExternalMode=true;await setTab('editor');panel.querySelector('#lp-release').click();}catch(err){petExternalMode=false;window.dispatchEvent(new CustomEvent('duangduang:pet-release-failed',{detail:{message:err.message||'桌宠放出失败'}}));toast(err.message||'桌宠放出失败');}});
+ window.addEventListener('duangduang:pet-release-image',async e=>{const blob=e.detail?.blob,url=e.detail?.url;if(!blob&&!url)return;try{let source=blob;if(!source&&url){try{const response=await fetch(url);if(response.ok)source=await response.blob();}catch{}source=source||url;}await setPetImage(source);petExternalMode=true;await setTab('editor');panel.querySelector('#lp-release').click();}catch(err){petExternalMode=false;window.dispatchEvent(new CustomEvent('duangduang:pet-release-failed',{detail:{message:err.message||'桌宠放出失败'}}));toast(err.message||'桌宠放出失败');}});
  panel.querySelector('#lp-reset').addEventListener('click',()=>{if(!petImage)return;petImage._ddJellyAbort?.abort();ddJellyClearSelection(petImage);ddPersistMask(petImage,ddJellyState(petImage));ddAttachJelly(petImage);petImage._ddJellyPrepare?.();toast('互动状态已复位');});
  panel.querySelector('#lp-remove-image').addEventListener('click',async()=>{if(petEraser)await ddSetEraser(false);detachPet();petBlob=null;petEraserHistory=[];await dbDelete('pet-image');await dbDelete('pet-mask');const stage=panel.querySelector('#lp-stage');let empty=stage.querySelector('#lp-empty');if(!empty){empty=document.createElement('div');empty.id='lp-empty';empty.className='lp-empty';empty.innerHTML='<b>放一张图片进来</b><small>支持 PNG、WebP、JPG，建议透明背景立绘</small><button id="lp-upload" type="button">选择图片</button>';empty.querySelector('#lp-upload').addEventListener('click',()=>fileInput.click());}stage.replaceChildren(empty);empty.hidden=false;panel.querySelector('#lp-jelly-slot').replaceChildren();toast('图片已移除');});
  // 编辑器入口由酒馆魔法棒菜单提供；不再创建悬浮球。
