@@ -599,7 +599,7 @@ async function ddFinishBgEraser(dlg){
  const st=dlg?._ddBgEraser;if(!st)return;
  const img=dlg.querySelector('img'),blob=await new Promise(resolve=>st.canvas.toBlob(resolve,'image/png'));
  if(!blob){ddToast('透明图片生成失败');return;}
- const url=URL.createObjectURL(blob);ddLastCutoutBlob=blob;if(dlg._ddCutoutUrl)URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl=url;dlg._ddCutoutReady=true;st.canvas.remove();dlg._ddBgEraser=null;img.style.visibility='';img.src=url;
+ const url=URL.createObjectURL(blob);ddLastCutoutBlob=blob;const releaseButton=document.querySelector('#dd-image-float');if(releaseButton)releaseButton.disabled=false;if(dlg._ddCutoutUrl)URL.revokeObjectURL(dlg._ddCutoutUrl);dlg._ddCutoutUrl=url;dlg._ddCutoutReady=true;st.canvas.remove();dlg._ddBgEraser=null;img.style.visibility='';img.src=url;
  await new Promise(resolve=>{if(img.complete)resolve();else{img.onload=resolve;img.onerror=resolve;}});
  dlg._ddBgTools.querySelector('.dd-bg-brushes').hidden=true;dlg._ddBgTools.querySelector('.dd-bg-edit-actions').hidden=true;ddAttachJelly(img);
  dlg._ddBgTools.querySelector('.dd-bg-status').textContent='背景擦除完成。原图已保留，可随时恢复；现在可以放出桌宠。';
@@ -812,7 +812,7 @@ async function ddHandleTap(x,y){
   const url=await ddSourceOf(hit);
   if(!url){ddToast('这张图抓不到（可能被浏览器保护了）');return;}
   ddShowPickUi(false);
-  ddLastCutoutBlob=null;ddOpenViewer(url,hit.el);
+  ddLastCutoutBlob=null;const releaseButton=document.querySelector('#dd-image-float');if(releaseButton)releaseButton.disabled=true;ddOpenViewer(url,hit.el);
  }catch(err){
   console.warn('[duangduang] 选图失败',err);
   ddToast('选图出错：'+((err&&err.message)||err));
@@ -1200,7 +1200,7 @@ window.DuangDuang={
   try{
    const url=await ddMaterialize(String(src||'').trim());
    if(!url)return false;
-   ddLastCutoutBlob=null;ddOpenViewer(url);return true;
+   ddLastCutoutBlob=null;const releaseButton=document.querySelector('#dd-image-float');if(releaseButton)releaseButton.disabled=true;ddOpenViewer(url);return true;
   }catch(err){console.warn('[duangduang] openImage 失败',err);return false;}
  },
  close(){const d=document.querySelector('dialog.dd-viewer[open]');if(d){d.close();return true;}return false;},
