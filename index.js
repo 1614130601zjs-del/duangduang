@@ -313,7 +313,7 @@ function ddAttachJelly(img){
   if(scope==='whole'){
    const quick=Date.now()-p.t<450&&!p.moved;
    if(quick&&conf.tap){aff.x[2]=1+.11*amp;aff.x[3]=1-.14*amp;aff.v[2]=0;aff.v[3]=0;}
-   else if(p.moved&&conf.drag){ddPlaySound('release');aff.v[2]-=(aff.x[2]-1)*.35;aff.v[3]-=(aff.x[3]-1)*.35;}
+   else if(p.moved&&conf.drag){aff.v[2]-=(aff.x[2]-1)*.35;aff.v[3]-=(aff.x[3]-1)*.35;}
    aff.t=[0,0,1,1,0];
   }
   if(!S.selecting&&!p.moved&&Date.now()-p.t<450&&!conf.burst)ddPlaySound('tap'); else if(p.moved&&conf.drag)ddPlaySound('release');
