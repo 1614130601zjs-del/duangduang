@@ -1070,7 +1070,7 @@ function ddMountBall(){
   }else{
    const dlg=document.querySelector('dialog.dd-viewer[open]');
    if(dlg){dlg.close();return;}
-   window.dispatchEvent(new CustomEvent('duangduang:pet-pick-start'));
+   ddPicking?ddExitPick():ddEnterPick();
   }
  };
  ball.addEventListener('pointerup',end);ball.addEventListener('pointercancel',end);
